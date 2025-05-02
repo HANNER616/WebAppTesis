@@ -55,11 +55,11 @@ const login = async (req, res) => {
 }
 
 
-const passwordReset = async (req, res) => {
+const passwordSendToken = async (req, res) => {
     const { email } = req.body;
 
     try {
-        const user = await User.findByEmail(email);
+        const user = await User.findUser(email);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -70,6 +70,7 @@ const passwordReset = async (req, res) => {
 
         const transporter = nodemailer.createTransport({
             service: 'gmail',
+
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
@@ -88,8 +89,6 @@ const passwordReset = async (req, res) => {
         await transporter.sendMail(mailOptions);
 
         return res.status(200).json({ message: 'Password reset token sent to email' });
-
-
 
     } catch (error) {
         console.error('Error sending password reset email:', error);
@@ -160,7 +159,8 @@ const verifyToken = async (req, res) => {
 module.exports = {
     signup,
     login,
-    passwordReset,
+    passwordSendToken,
     updatePassword,
+    updatePasswordReset,
     verifyToken
 };
