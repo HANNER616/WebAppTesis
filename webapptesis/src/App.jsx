@@ -1,52 +1,69 @@
 "use client"
 
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom"
 import { useState } from "react"
-import { Menu, Camera, FileText, Settings } from "lucide-react"
+import { AuthProvider, useAuth } from "./AuthContext"
+import { Menu, Camera, FileText, Settings, LogOut } from "lucide-react"
 import AlertsSummary from "./pages/AlertsSummary"
 import ConfigCamera from "./pages/ConfigCamera"
 import ConfigAccount from "./pages/ConfigAccount"
 import Auth from "./pages/Auth"
 import "./index.css"
 
-function App() {
-  // Estado para simular autenticación
-  const [isAuthenticated, setIsAuthenticated] = useState(true)
 
-  // Componente para proteger rutas
-  const ProtectedRoute = ({ children }) => {
-    if (!isAuthenticated) {
-      return <Navigate to="/auth" replace />
-    }
-    return children
+// Estado para simular autenticación
+//const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+// Componente para proteger rutas
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated } = useAuth(); // Usa el contexto
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
   }
+  return children;
+};
+
+
+function App() {
+
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <AppLayout>
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/alerts" element={<AlertsSummary />} />
-                  <Route path="/config-camera" element={<ConfigCamera />} />
-                  <Route path="/config-account" element={<ConfigAccount />} />
-                </Routes>
-              </AppLayout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/alerts" element={<AlertsSummary />} />
+                    <Route path="/config-camera" element={<ConfigCamera />} />
+                    <Route path="/config-account" element={<ConfigAccount />} />
+                  </Routes>
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
   )
 }
 
 // Componente de Layout para las páginas autenticadas
 function AppLayout({ children }) {
+
+  const { logout } = useAuth(); // Obtén la función logout del contexto
+  const navigate = useNavigate(); // Hook para redirigir
+
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="border-b">
@@ -58,12 +75,18 @@ function AppLayout({ children }) {
             <button className="p-2 rounded-full hover:bg-gray-100">
               <Menu className="h-5 w-5" />
             </button>
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-              <Link to="/config-camera" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+            <div className="absolute right-0 top-full w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
+              <Link
+                to="/config-camera"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
                 <Camera className="mr-2 h-4 w-4" />
                 <span>Configuración de Cámara</span>
               </Link>
-              <Link to="/alerts" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <Link
+                to="/alerts"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
                 <FileText className="mr-2 h-4 w-4" />
                 <span>Registro de Incidentes</span>
               </Link>
@@ -74,6 +97,13 @@ function AppLayout({ children }) {
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configuración</span>
               </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Salir</span>
+              </button>
             </div>
           </div>
         </div>

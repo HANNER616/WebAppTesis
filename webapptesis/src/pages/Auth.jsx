@@ -3,41 +3,206 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Eye, User, Lock } from 'lucide-react'
+import { useAuth } from '../AuthContext'; 
+
 
 export default function Auth() {
   const navigate = useNavigate()
   const [view, setView] = useState("login") // login, register, forgotPassword, resetPassword
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  
-  const handleLogin = (e) => {
+  const { login } = useAuth();
+
+  const handleLogin = async (e) => {
     e.preventDefault()
-    // Aquí iría la lógica de autenticación
-    navigate("/") // Redirigir al dashboard después del login
+    // llamada a un microservicio para autenticar al usuario
+    //http://localhost:3000/service/auth/login 
+
+    const formData = {
+      identifier: e.target[0].value, // username/email  
+      password: e.target[1].value, // password
+    }
+
+    //console.log(formData);
+
+
+    // SEND DATA TO API
+    try {
+      const response = await fetch('http://localhost:3000/service/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Login exitoso:', data);
+
+        localStorage.setItem('token', data.userInfo.token);
+        localStorage.setItem('username', data.userInfo.username); 
+        localStorage.setItem('email', data.userInfo.email);
+
+        login();
+        navigate("/") // Redirigir al dashboard después del login
+
+      } else {
+        console.error('Error en el login:', data.message);
+      }
+    } catch (error) {
+      console.error('Error al conectar con la API:', error);
+    }
+    
+
+    
+    
   }
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault()
-    // Aquí iría la lógica de registro
-    setView("login")
+
+    const formData = {
+      username: e.target[1].value,
+      email: e.target[0].value,
+      password: e.target[2].value
+    }
+
+    try {
+      const response = await fetch('http://localhost:3000/service/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Signup succesfully:', data);
+
+        setView("login")
+
+      } else {
+        console.error('Error en el login:', data.message);
+      }
+    } catch (error) {
+      console.error('Error al conectar con la API:', error);
+    }
+
+
+    
+
+    
   }
 
-  const handleSendRecoveryEmail = (e) => {
+  const handleSendRecoveryEmail = async (e) => {
     e.preventDefault()
-    // Aquí iría la lógica para enviar el email de recuperación
-    setView("enterToken")
+    const formData = {
+      email: e.target[0].value, // email
+    }
+
+    //save email in local storage
+    localStorage.setItem('email', formData.email);
+    try{
+      const response = await fetch('http://localhost:3000/service/auth/password-send-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Token has been sent succesfully:', data);
+        
+      } else {
+        console.error('Token has not been sent succesfully:', data.message);
+      }
+
+      setView("enterToken")
+
+
+    }catch (error) {
+      console.error('API CONNECTION ERROR:', error);
+    
+    }
   }
 
-  const handleVerifyToken = (e) => {
+  const handleVerifyToken = async (e) => {
     e.preventDefault()
-    // Aquí iría la lógica para verificar el token
-    setView("resetPassword")
+    
+    const formData = {
+      token: e.target[0].value, // token
+    }
+
+    try{
+      const response = await fetch('http://localhost:3000/service/auth/verify-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Token has been verified succesfully:', data);
+        setView("resetPassword")
+        
+      } else {
+        //ventana emergente de error
+        console.error('Token invalid or expired:', data.message);
+      }
+
+    }catch (error) {
+      console.error('API CONNECTION ERROR:', error);
+    }
+
+    
   }
 
-  const handleResetPassword = (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault()
-    // Aquí iría la lógica para restablecer la contraseña
-    setView("login")
+    
+    const formData = {
+      newPassword: e.target[0].value,
+      email: localStorage.getItem('email'), // email
+    }
+
+    try{
+
+    
+
+    const response = await fetch('http://localhost:3000/service/auth/password-reset', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData),
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      console.log('Password has been reset succesfully:', data);
+      setView("login")
+
+    } else {
+      console.error('Password has not been reset succesfully:', data.message);
+    }
+
+  }catch (error) {
+    console.error('API CONNECTION ERROR:', error);
+
+  }
+
+
+    
   }
 
   return (
