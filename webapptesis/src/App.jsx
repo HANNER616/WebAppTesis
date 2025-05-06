@@ -1,7 +1,7 @@
 "use client"
 
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { AuthProvider, useAuth } from "./AuthContext"
 import { Menu, Camera, FileText, Settings, LogOut } from "lucide-react"
 import AlertsSummary from "./pages/AlertsSummary"
@@ -9,6 +9,7 @@ import ConfigCamera from "./pages/ConfigCamera"
 import ConfigAccount from "./pages/ConfigAccount"
 import Auth from "./pages/Auth"
 import "./index.css"
+import Webcam from './components/Webcam'
 
 
 // Estado para simular autenticación
@@ -122,6 +123,37 @@ function AppLayout({ children }) {
 
 // Componente de la página principal
 function HomePage() {
+
+  //WEBCAM -------------------------------------------------------------
+  const [showWebcam, setShowWebcam] = useState(false);
+  const webcamRef = useRef(null);
+
+   
+    useEffect(() => {
+    let mounted = true;
+    
+    const checkWebcam = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (mounted) {
+          setShowWebcam(true);
+        }
+        // Detener el stream inmediatamente después de la verificación
+        stream.getTracks().forEach(track => track.stop());
+      } catch (error) {
+        if (mounted) {
+          setShowWebcam(false);
+        }
+      }
+    };
+
+    checkWebcam();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+ //---------------------------------------------------------------------
   const [alerts] = useState([
     { id: 1, message: "Comportamiento sospechoso detectado - Estudiante en fila 3, asiento 2", time: "10:15 AM" },
     { id: 2, message: "Posible intento de copia - Estudiante en fila 2, asiento 5", time: "10:20 AM" },
@@ -131,8 +163,18 @@ function HomePage() {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div className="md:col-span-2 bg-white p-4 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Vista de Cámara</h2>
-        <div className="aspect-video bg-gray-200 flex items-center justify-center">
-          <Camera className="h-16 w-16 text-gray-400" />
+        <div className="aspect-video bg-gray-200 flex items-center justify-center relative">
+          {showWebcam ? (
+            <Webcam
+              ref={webcamRef}
+              className="h-full w-full object-cover"
+              audio={false}
+              screenshotFormat="image/jpeg"
+              videoConstraints={{ facingMode: 'user' }}
+            />
+          ) : (
+            <Camera className="h-16 w-16 text-gray-400" />
+          )}
         </div>
       </div>
 
