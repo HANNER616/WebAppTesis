@@ -1,11 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function ConfigCamera() {
   const [resolution, setResolution] = useState("720p")
   const [fps, setFps] = useState(30)
   const [nightMode, setNightMode] = useState(false)
+  const [cameras, setCameras] = useState([])
+
+
+  useEffect(() => {
+
+    async function listCameras() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true })
+        // listar dispositivos conectados
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        //filtrar solo los dispositivos de video
+        const videoDevices = devices.filter(device => device.kind === 'videoinput')
+        setCameras(videoDevices)
+        console.log("camaras encontradas: ", videoDevices)
+      } catch (error) {
+        console.error("CAMARAS NO ENCONTRADAS CONFIG CAMERA.JSX", error)
+        setCameras([])
+      }
+    }
+
+    listCameras();
+
+
+  }, [])
+
+
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -21,8 +47,11 @@ export default function ConfigCamera() {
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">Seleccionar cámara</option>
-            <option value="cam1">Cámara 1 - Parte trasera del aula</option>
-            <option value="cam2">Cámara 2 - Esquina derecha</option>
+            {cameras.map((cam, idx) => (
+              <option key={cam.deviceId} value={cam.deviceId}>
+                {cam.label || `Cámara:  ${idx + 1}`}
+              </option>
+            ))}
           </select>
         </div>
 
