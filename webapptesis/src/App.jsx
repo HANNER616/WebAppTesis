@@ -3,10 +3,11 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom"
 import { useState, useRef, useEffect } from "react"
 import { AuthProvider, useAuth } from "./AuthContext"
+import { ThemeProvider } from "./ThemeContext"
 import { Menu, Camera, FileText, Settings, LogOut } from "lucide-react"
 import AlertsSummary from "./pages/AlertsSummary"
 import ConfigCamera from "./pages/ConfigCamera"
-import ConfigAccount from "./pages/ConfigAccount"
+import AppConfig from "./pages/AppConfig"
 import Auth from "./pages/Auth"
 import "./index.css"
 import Webcam from './components/Webcam'
@@ -30,6 +31,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <ThemeProvider>
       <Router>
         <Routes>
           <Route path="/auth" element={<Auth />} />
@@ -42,7 +44,7 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/alerts" element={<AlertsSummary />} />
                     <Route path="/config-camera" element={<ConfigCamera />} />
-                    <Route path="/config-account" element={<ConfigAccount />} />
+                    <Route path="/config-app" element={<AppConfig />} />
                   </Routes>
                 </AppLayout>
               </ProtectedRoute>
@@ -50,6 +52,7 @@ function App() {
           />
         </Routes>
       </Router>
+      </ThemeProvider>
     </AuthProvider>
   )
 }
@@ -66,54 +69,83 @@ function AppLayout({ children }) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className="border-b">
+    <div className="
+      flex flex-col min-h-screen
+      bg-white text-gray-900
+      dark:bg-gray-900 dark:text-gray-100
+    ">
+      <header className="
+        border-b border-gray-200 dark:border-gray-700
+        bg-white dark:bg-gray-800
+      ">
         <div className="container mx-auto px-4 py-2 flex justify-between items-center">
           <Link to="/" className="text-2xl font-bold">
             Monitor de Aula
           </Link>
+
           <div className="relative group">
-            <button className="p-2 rounded-full hover:bg-gray-100">
-              <Menu className="h-5 w-5" />
+            <button className="
+              p-2 rounded-full
+              hover:bg-gray-100 dark:hover:bg-gray-700
+              transition
+            ">
+              <Menu className="h-5 w-5 text-gray-800 dark:text-gray-200" />
             </button>
-            <div className="absolute right-0 top-full w-48 bg-white rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-              <Link
-                to="/config-camera"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
+            <div className="
+              absolute right-0 top-full w-48
+              bg-white dark:bg-gray-800
+              rounded-md shadow-lg py-1
+              z-10 hidden group-hover:block
+            ">
+              <Link to="/config-camera" className="
+                flex items-center px-4 py-2 text-sm
+                text-gray-700 dark:text-gray-200
+                hover:bg-gray-100 dark:hover:bg-gray-700
+              ">
                 <Camera className="mr-2 h-4 w-4" />
-                <span>Configuración de Cámara</span>
+                Configuración de Cámara
               </Link>
-              <Link
-                to="/alerts"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
+              <Link to="/alerts" className="
+                flex items-center px-4 py-2 text-sm
+                text-gray-700 dark:text-gray-200
+                hover:bg-gray-100 dark:hover:bg-gray-700
+              ">
                 <FileText className="mr-2 h-4 w-4" />
-                <span>Registro de Incidentes</span>
+                Registro de Incidentes
               </Link>
-              <Link
-                to="/config-account"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
+              <Link to="/config-app" className="
+                flex items-center px-4 py-2 text-sm
+                text-gray-700 dark:text-gray-200
+                hover:bg-gray-100 dark:hover:bg-gray-700
+              ">
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Configuración</span>
+                Configuración
               </Link>
               <button
                 onClick={handleLogout}
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-              >
+                className="
+                  flex items-center px-4 py-2 text-sm
+                  text-gray-700 dark:text-gray-200
+                  hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left
+                ">
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Salir</span>
+                Salir
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-4 py-8">{children}</main>
+      <main className="flex-grow container mx-auto px-4 py-8">
+        {children}
+      </main>
 
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-2 text-center text-sm text-gray-500">
+      <footer className="
+        border-t border-gray-200 dark:border-gray-700
+        bg-transparent
+      ">
+        <div className="container mx-auto px-4 py-2 text-center text-sm
+                        text-gray-500 dark:text-gray-400">
           © 2023 Monitor de Aula. Todos los derechos reservados.
         </div>
       </footer>
@@ -161,9 +193,12 @@ function HomePage() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div className="md:col-span-2 bg-white p-4 rounded-lg shadow">
+      <div className="
+        md:col-span-2 p-4 rounded-lg shadow
+        bg-white dark:bg-gray-800 transition-colors
+      ">
         <h2 className="text-xl font-semibold mb-4">Vista de Cámara</h2>
-        <div className="aspect-video bg-gray-200 flex items-center justify-center relative">
+        <div className="aspect-video bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
           {showWebcam ? (
             <Webcam
               ref={webcamRef}
@@ -173,34 +208,27 @@ function HomePage() {
               videoConstraints={{ facingMode: 'user' }}
             />
           ) : (
-            <Camera className="h-16 w-16 text-gray-400" />
+            <Camera className="h-16 w-16 text-gray-400 dark:text-gray-500" />
           )}
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow">
+      <div className="
+        p-4 rounded-lg shadow
+        bg-white dark:bg-gray-800 transition-colors
+      ">
         <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 mr-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-            />
-          </svg>
+          <FileText className="mr-2 h-5 w-5" />
           Alertas
         </h2>
         <ul className="space-y-4">
-          {alerts.map((alert) => (
-            <li key={alert.id} className="bg-yellow-100 p-3 rounded-md">
+          {alerts.map(alert => (
+            <li key={alert.id} className="
+              bg-yellow-100 dark:bg-yellow-900
+              p-3 rounded-md
+            ">
               <p className="text-sm font-medium">{alert.message}</p>
-              <p className="text-xs text-gray-500 mt-1">{alert.time}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{alert.time}</p>
             </li>
           ))}
         </ul>
