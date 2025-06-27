@@ -10,6 +10,7 @@ async def video_stream(websocket: WebSocket):
     await websocket.accept()
     frame_count = 0
 
+
     try:
         while True:
             # Espera texto (el cliente envía JSON con { image: "<base64>" })
@@ -17,7 +18,7 @@ async def video_stream(websocket: WebSocket):
             frame_count += 1
 
             # Cada 1000 fotogramas, resetea contador y responde
-            if frame_count >= 20:
+            if frame_count >= 5:
                 frame_count = 0
                 # Aquí podrías generar alertas de prueba
                 alerts = []

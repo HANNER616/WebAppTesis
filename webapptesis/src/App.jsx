@@ -32,26 +32,26 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-      <Router>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/alerts" element={<AlertsSummary />} />
-                    <Route path="/config-camera" element={<ConfigCamera />} />
-                    <Route path="/config-app" element={<AppConfig />} />
-                  </Routes>
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
+        <Router>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/alerts" element={<AlertsSummary />} />
+                      <Route path="/config-camera" element={<ConfigCamera />} />
+                      <Route path="/config-app" element={<AppConfig />} />
+                    </Routes>
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
       </ThemeProvider>
     </AuthProvider>
   )
@@ -136,7 +136,7 @@ function AppLayout({ children }) {
         </div>
       </header>
 
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className="flex-grow container mx-auto px-4 py-8 h-full">
         {children}
       </main>
 
@@ -160,10 +160,10 @@ function HomePage() {
   const [showWebcam, setShowWebcam] = useState(false);
   const webcamRef = useRef(null);
 
-   
-    useEffect(() => {
+
+  useEffect(() => {
     let mounted = true;
-    
+
     const checkWebcam = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -185,14 +185,15 @@ function HomePage() {
       mounted = false;
     };
   }, []);
- //---------------------------------------------------------------------
-  const [alerts] = useState([
-    { id: 1, message: "Comportamiento sospechoso detectado - Estudiante en fila 3, asiento 2", time: "10:15 AM" },
-    { id: 2, message: "Posible intento de copia - Estudiante en fila 2, asiento 5", time: "10:20 AM" },
-  ])
+  //---------------------------------------------------------------------
+  const [alerts, setAlerts] = useState([])
+
+  const handleNewAlert = (alert) => {
+    setAlerts(prevAlerts => [...prevAlerts, alert]);
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 h-full">
       <div className="
         md:col-span-2 p-4 rounded-lg shadow
         bg-white dark:bg-gray-800 transition-colors
@@ -202,6 +203,7 @@ function HomePage() {
           {showWebcam ? (
             <Webcam
               ref={webcamRef}
+              onNewAlert={handleNewAlert}
               className="h-full w-full object-cover"
               audio={false}
               screenshotFormat="image/jpeg"
@@ -214,25 +216,42 @@ function HomePage() {
       </div>
 
       <div className="
-        p-4 rounded-lg shadow
-        bg-white dark:bg-gray-800 transition-colors
-      ">
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <FileText className="mr-2 h-5 w-5" />
-          Alertas
-        </h2>
-        <ul className="space-y-4">
-          {alerts.map(alert => (
-            <li key={alert.id} className="
-              bg-yellow-100 dark:bg-yellow-900
-              p-3 rounded-md
-            ">
-              <p className="text-sm font-medium">{alert.message}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{alert.time}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+  p-4 rounded-lg shadow
+  bg-white dark:bg-gray-800 transition-colors
+">
+  <h2 className="text-xl font-semibold mb-4 flex items-center">
+    <FileText className="mr-2 h-5 w-5" />
+    Alertas
+  </h2>
+  <ul className="
+    overflow-y-auto  /* scroll cuando rebasa */
+    space-y-4
+    max-h-[550px] /* altura máxima para el scroll */
+
+  ">
+  {alerts.map((a, i) => (
+    <li
+      key={i}
+      className="
+        w-full
+        border-2 border-orange-500
+        bg-orange-100 dark:bg-orange-900
+        rounded-lg
+        p-3
+        shadow-sm
+      "
+    >
+      <strong className="text-orange-700">{a.alert}</strong>: {a.alert}
+    </li>
+  ))}
+  {alerts.length === 0 && (
+    <li className="w-full text-center text-gray-500 dark:text-gray-400">
+      No hay alertas
+    </li>
+  )}
+</ul>
+</div>
+
     </div>
   )
 }

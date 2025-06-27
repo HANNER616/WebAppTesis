@@ -1,4 +1,4 @@
-// components/CameraComponent.jsx
+// components/Webcam.jsx.jsx
 import React, { useRef, useEffect, useState } from "react";
 import Webcam from "react-webcam";
 
@@ -8,11 +8,35 @@ const videoConstraints = {
   facingMode: "user",
 };
 
-const CameraComponent = () => {
+// components/Webcam.jsx
+import alertSound from '../assets/alert-sound.mp3';
+
+
+
+const CameraComponent = ({ onNewAlert }) => {
+
+
+  const audioRef = useRef();
+
   const webcamRef = useRef(null);
   const [response, setResponse] = useState(null);
 
   useEffect(() => {
+    // Una llamada “vacía” a play() tras un click desbloquea el autoplay API
+    const unlock = () => {
+      audioRef.current.play().catch(() => { });
+      window.removeEventListener('click', unlock);
+    };
+    window.addEventListener('click', unlock);
+    return () => window.removeEventListener('click', unlock);
+  }, []);
+
+  // inicializar el audioRef con el sonido 
+  useEffect(() => {
+
+    audioRef.current = new Audio(alertSound);
+
+
     // 1) Abrir conexión WS
     const ws = new WebSocket("ws://localhost:8080/video-stream");
     let captureInterval;
@@ -33,13 +57,32 @@ const CameraComponent = () => {
 
     // 3) Procesar mensajes entrantes
     ws.onmessage = ({ data }) => {
+      let newAlert;
       try {
         const json = JSON.parse(data);
         console.log("Respuesta del servidor:", json);
         setResponse(json);
+        newAlert = json.alerts;
       } catch (err) {
         console.error("Error parseando JSON del servidor:", err);
       }
+
+      const audio = audioRef.current;
+
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {
+          console.warn('Interacción previa requerida');
+        });
+      }
+
+      onNewAlert(newAlert);
+
+
+
+
+
+
     };
 
     ws.onerror = (err) => {
