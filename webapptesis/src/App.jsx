@@ -1,7 +1,7 @@
 "use client"
 
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect,useContext } from "react"
 import { AuthProvider, useAuth } from "./AuthContext"
 import { ThemeProvider } from "./ThemeContext"
 import { Menu, Camera, FileText, Settings, LogOut } from "lucide-react"
@@ -11,6 +11,8 @@ import AppConfig from "./pages/AppConfig"
 import Auth from "./pages/Auth"
 import "./index.css"
 import Webcam from './components/Webcam'
+import { openFrameInNewTab } from "./helpers";
+import { AlertsProvider, AlertsContext } from './AlertsContext'
 
 
 // Estado para simular autenticación
@@ -32,6 +34,7 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
+        <AlertsProvider>
         <Router>
           <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -52,6 +55,7 @@ function App() {
             />
           </Routes>
         </Router>
+        </AlertsProvider>
       </ThemeProvider>
     </AuthProvider>
   )
@@ -62,9 +66,11 @@ function AppLayout({ children }) {
 
   const { logout } = useAuth(); // Obtén la función logout del contexto
   const navigate = useNavigate(); // Hook para redirigir
+  const { alerts, setAlerts } = useContext(AlertsContext)
 
   const handleLogout = () => {
     logout();
+    setAlerts([])
     navigate('/auth');
   }
 
@@ -136,6 +142,7 @@ function AppLayout({ children }) {
         </div>
       </header>
 
+
       <main className="flex-grow container mx-auto px-4 py-8 h-full">
         {children}
       </main>
@@ -186,7 +193,7 @@ function HomePage() {
     };
   }, []);
   //---------------------------------------------------------------------
-  const [alerts, setAlerts] = useState([])
+  const { alerts, setAlerts } = useContext(AlertsContext)
 
   const handleNewAlert = (alert) => {
     setAlerts(prevAlerts => [...prevAlerts, alert]);
@@ -219,20 +226,20 @@ function HomePage() {
   p-4 rounded-lg shadow
   bg-white dark:bg-gray-800 transition-colors
 ">
-  <h2 className="text-xl font-semibold mb-4 flex items-center">
-    <FileText className="mr-2 h-5 w-5" />
-    Alertas
-  </h2>
-  <ul className="
+        <h2 className="text-xl font-semibold mb-4 flex items-center">
+          <FileText className="mr-2 h-5 w-5" />
+          Alertas
+        </h2>
+        <ul className="
     overflow-y-auto  /* scroll cuando rebasa */
     space-y-4
     max-h-[550px] /* altura máxima para el scroll */
 
   ">
-  {alerts.map((a, i) => (
-    <li
-      key={i}
-      className="
+          {alerts.map((a, i) => (
+            <li
+              key={i}
+              className="
         w-full
         border-2 border-orange-500
         bg-orange-100 dark:bg-orange-900
@@ -240,17 +247,27 @@ function HomePage() {
         p-3
         shadow-sm
       "
-    >
-      <strong className="text-orange-700">{a.alert}</strong>: {a.alert}
-    </li>
-  ))}
-  {alerts.length === 0 && (
-    <li className="w-full text-center text-gray-500 dark:text-gray-400">
-      No hay alertas
-    </li>
-  )}
-</ul>
-</div>
+            >
+              <strong className="text-orange-700">⚠️</strong>: {a.timestamp}
+              <p className="text-sm text-gray-700 dark:text-gray-300">{a.description}</p>
+              <button
+    key={i}
+    onClick={() => openFrameInNewTab(a.frame)}
+    className="text-blue-600 underline cursor-pointer"
+  >
+    Clic para ver imagen
+  </button>
+
+
+            </li>
+          ))}
+          {alerts.length === 0 && (
+            <li className="w-full text-center text-gray-500 dark:text-gray-400">
+              No hay alertas
+            </li>
+          )}
+        </ul>
+      </div>
 
     </div>
   )

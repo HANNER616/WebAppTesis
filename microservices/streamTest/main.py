@@ -17,11 +17,18 @@ async def video_stream(websocket: WebSocket):
             msg = await websocket.receive_text()
             frame_count += 1
 
-            # Cada 1000 fotogramas, resetea contador y responde
-            if frame_count >= 5:
+            if frame_count >= 25:
                 frame_count = 0
                 # Aquí podrías generar alertas de prueba
-                alerts = []
+                alerts = [
+                    {
+                        "id": 1,
+                        "type": "motion",
+                        "timestamp": "2025-10-01T12:00:00Z",
+                        "description": "Movimiento sospechoso detectado en la cámara",
+                        "frame" : msg
+                    }
+                ]
                 await websocket.send_json({ "alerts": alerts })
 
     except Exception:

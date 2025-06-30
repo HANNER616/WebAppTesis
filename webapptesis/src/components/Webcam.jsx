@@ -57,32 +57,52 @@ const CameraComponent = ({ onNewAlert }) => {
 
     // 3) Procesar mensajes entrantes
     ws.onmessage = ({ data }) => {
-      let newAlert;
       try {
-        const json = JSON.parse(data);
-        console.log("Respuesta del servidor:", json);
-        setResponse(json);
-        newAlert = json.alerts;
-      } catch (err) {
-        console.error("Error parseando JSON del servidor:", err);
-      }
+        const { alerts } = JSON.parse(data);
+        if (!Array.isArray(alerts)) return;
 
-      const audio = audioRef.current;
+        // Guardamos la última respuesta para el overlay
+        setResponse({ alerts });
 
-      if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(() => {
-          console.warn('Interacción previa requerida');
+        alerts.forEach(alert => {
+          // 1) Parseamos el frame (es un string JSON)
+          let parsed;
+          try {
+            parsed = JSON.parse(alert.frame);
+          } catch {
+            console.warn("alert.frame no es JSON, usamos raw:", alert.frame);
+            parsed = { image: alert.frame };
+          }
+          let imageData = parsed.image;
+          // Si vino como data URI, separamos el prefix
+          if (imageData.startsWith('data:')) {
+            imageData = imageData.split(',')[1];
+          }
+
+          // 2) Forzamos descarga automática
+          const link = document.createElement("a");
+          link.href = `data:image/jpeg;base64,${imageData}`;
+          const ts = new Date(alert.timestamp)
+            .toISOString()
+            .replace(/[:.]/g, "-");
+          link.download = `alert_${alert.id}_${ts}.jpg`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // 3) Sonido de alerta
+          const audio = audioRef.current;
+          audio.currentTime = 0;
+          audio.play().catch(() => {
+            console.warn('Interacción previa requerida para reproducir sonido');
+          });
+
+          // 4) Notificar al padre
+          onNewAlert && onNewAlert(alert);
         });
+      } catch (err) {
+        console.error("Error procesando mensaje WS:", err);
       }
-
-      onNewAlert(newAlert);
-
-
-
-
-
-
     };
 
     ws.onerror = (err) => {
@@ -121,7 +141,7 @@ const CameraComponent = ({ onNewAlert }) => {
           borderRadius: 4,
           fontSize: 12,
         }}>
-          {JSON.stringify(response)}
+          
         </div>
       )}
     </div>
