@@ -6,6 +6,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import api from '../lib/api';
 
 
 export default function AlertsSummary() {
@@ -24,47 +25,51 @@ export default function AlertsSummary() {
   }, [alerts]);
 
   const handleFilter = async () => {
-    if (!startDate || !endDate) return;
+    console.log('🔍 handleFilter invoked', { startDate, endDate });
+    if (!startDate || !endDate) {
+      console.warn('❗ Falta startDate o endDate');
+      return;
+    }
+
     const start = `${startDate}T00:00:00-05:00`;
-    const end = `${endDate}T23:59:59-05:00`;
-    const email = localStorage.getItem('email'); // o donde tengas guardado el email
+    const end   = `${endDate}T23:59:59-05:00`;
+
     try {
-      const { data } = await axios.get('http://localhost:3001/service/audit/show-alerts', {
-        params: { email, startDate: start, endDate: end }
+      const resp = await api.get('/show-alerts', {
+        params: { startDate: start, endDate: end }
       });
-      setDisplayedAlerts(data);
+      console.log('📨 show-alerts response:', resp.data);
+      setDisplayedAlerts(resp.data);
     } catch (err) {
-      console.error('Error filtrando alertas:', err);
+      console.error('❌ Error en show-alerts:', err);
     }
   };
 
-  async function handleDownload() {
+  const handleDownload = async () => {
+    const BACKEND = 'http://localhost:3001';
+    const token   = localStorage.getItem('token');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Alertas');
 
     ws.columns = [
-      { header: 'Timestamp', key: 'time', width: 25 },
+      { header: 'Timestamp',   key: 'time',        width: 25 },
       { header: 'Descripción', key: 'description', width: 30 },
-      { header: 'Tipo', key: 'type', width: 15 },
-      { header: 'Imagen', key: 'link', width: 20 },
+      { header: 'Tipo',        key: 'type',        width: 15 },
+      { header: 'Imagen',      key: 'link',        width: 40 },
     ];
 
-    // Ajusta esto al host/puerto de tu API Express
-    const BACKEND = 'http://localhost:3001';
-
-    displayedAlerts.forEach((a, idx) => {
-      const rowNumber = idx + 2;
-      ws.addRow({
-        time: a.time ?? a.timestamp,
+    // ¡Aquí usas displayedAlerts!
+    displayedAlerts.forEach(a => {
+      const row = ws.addRow({
+        time:        a.time ?? a.timestamp,
         description: a.description,
-        type: a.type,
+        type:        a.type,
       });
 
-      // En la columna D creamos un hipervínculo a tu ruta montada
-      const cell = ws.getCell(`D${rowNumber}`);
+      const cell = ws.getCell(`D${row.number}`);
       cell.value = {
         text: 'Ver imagen',
-        hyperlink: `${BACKEND}/service/audit/alerts/${a.id}/frame`
+        hyperlink: `${BACKEND}/service/audit/alerts/${a.id}/frame?token=${token}`,
       };
       cell.font = { color: { argb: 'FF0000FF' }, underline: true };
     });
@@ -72,13 +77,40 @@ export default function AlertsSummary() {
     const buf = await wb.xlsx.writeBuffer();
     saveAs(
       new Blob([buf], {
-        type:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       }),
       'alertas.xlsx'
     );
-  }
+  };
 
+  const viewImage = async (id) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No hay token en localStorage');
+
+    const res = await api.get(
+      `/alerts/${id}/frame`,
+      {
+        responseType: 'blob',
+        headers: {
+          Authorization: `Bearer ${token}`, 
+        }
+      }
+    );
+
+    if (res.status !== 200) {
+      console.error('Respuesta inesperada:', res.status);
+      return;
+    }
+
+    const blob = res.data;
+    const url  = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    // Opcional: URL.revokeObjectURL(url) tras unos segundos
+  } catch (err) {
+    console.error('Error al cargar imagen:', err);
+  }
+};
 
 
   return (
@@ -142,12 +174,7 @@ export default function AlertsSummary() {
                 {a.description}
               </p>
               <button
-                onClick={() =>
-                  window.open(
-                    `http://localhost:3001/service/audit/alerts/${a.id}/frame`,
-                    '_blank',
-                    'noopener,noreferrer'
-                  )
+                onClick={() => viewImage(a.id)
                 }
                 className="text-blue-600 dark:text-blue-400 underline cursor-pointer mt-2"
               >

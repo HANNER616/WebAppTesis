@@ -6,10 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:3000',  // tu Express
+      // todo lo que empiece por /service/audit
+      '/service/audit': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, '/api')
+        secure: false,
+        // mantiene el mismo path, p.ej. /service/audit/show-alerts → 3001/service/audit/show-alerts
       }
     }
   }

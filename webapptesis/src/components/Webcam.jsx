@@ -14,11 +14,12 @@ import alertSound from '../assets/alert-sound.mp3';
 
 
 
-const CameraComponent = ({ onNewAlert }) => {
+const CameraComponent = ({ onNewAlert, examActive, paused }) => {
 
 
   const audioRef = useRef();
-
+  const wsRef = useRef(null);
+  const sendInterval = useRef(null);
   const webcamRef = useRef(null);
   const [response, setResponse] = useState(null);
   const [constraints, setConstraints] = useState(DEFAULT_CONSTRAINTS);
@@ -37,7 +38,7 @@ const CameraComponent = ({ onNewAlert }) => {
 
   useEffect(() => {
 
-     const raw = localStorage.getItem("cameraSettings");
+    const raw = localStorage.getItem("cameraSettings");
     if (!raw) return;
     const loaded = JSON.parse(raw);
 
@@ -47,10 +48,10 @@ const CameraComponent = ({ onNewAlert }) => {
       : loaded.deviceId?.exact?.exact ?? loaded.deviceId?.exact;
 
     const normalized = {
-      width:  loaded.width,
+      width: loaded.width,
       height: loaded.height,
       ...(loaded.frameRate && { frameRate: loaded.frameRate }),
-      ...(id &&           { deviceId: { exact: id } }),
+      ...(id && { deviceId: { exact: id } }),
       ...(loaded.facingMode && { facingMode: loaded.facingMode })
     };
 
@@ -59,117 +60,115 @@ const CameraComponent = ({ onNewAlert }) => {
 
 
 
-   
 
+
+  }, []);
+
+  useEffect(() => {
+    audioRef.current = new Audio(alertSound);
   }, []);
 
 
   useEffect(() => {
-   
-    audioRef.current = new Audio(alertSound);
+    // Si ya hay socket abierto se cierra
+    if (wsRef.current) {
+      clearInterval(sendInterval.current);
+      wsRef.current.close();
+      wsRef.current = null;
+    }
 
+    if (examActive) {
+      // 1) Abrir WS
+      const ws = new WebSocket("ws://localhost:8080/video-stream");
+      wsRef.current = ws;
 
-    // 1) Abrir conexión WS
-    const ws = new WebSocket("ws://localhost:8080/video-stream");
-    let captureInterval;
-
-    ws.onopen = () => {
-      console.log("WebSocket conectado a ws://localhost:8080/video-stream");
-
-      // 2) Cada 500 ms tomamos un screenshot y lo enviamos
-      captureInterval = setInterval(() => {
-        if (webcamRef.current) {
-          const imageSrc = webcamRef.current.getScreenshot();
-          if (imageSrc) {
-            ws.send(JSON.stringify({ image: imageSrc }));
-          }
+      ws.onopen = () => {
+        console.log("WebSocket conectado");
+        // 2) Arranca envío solo si no está paused
+        if (!paused) {
+          sendInterval.current = setInterval(sendFrame, 500);
         }
-      }, 500);
+      };
+
+      ws.onmessage = handleMessage;
+      ws.onerror = err => console.error("WS error:", err);
+      ws.onclose = () => {
+        console.log("WebSocket cerrado");
+        clearInterval(sendInterval.current);
+      };
+
+    } else {
+      // examActive === false: nos aseguramos de limpiar intervalos
+      clearInterval(sendInterval.current);
+    }
+
+    return () => {
+      // Cleanup al desmontar o cambiar examActive
+      clearInterval(sendInterval.current);
+      wsRef.current?.close();
+      wsRef.current = null;
     };
+  }, [examActive]);
 
-    // 3) Procesar mensajes entrantes
-    ws.onmessage = ({ data }) => {
-      try {
-        const { alerts } = JSON.parse(data);
-        if (!Array.isArray(alerts)) return;
+  // Reinicia el envío de frames si se pausa o reanuda el examen
+  useEffect(() => {
+    if (!examActive || !wsRef.current) return;
+    clearInterval(sendInterval.current);
+    if (!paused) {
+      // reanudar envío
+      sendInterval.current = setInterval(sendFrame, 500);
+    }
+  }, [paused]);
 
-        // Guardamos la última respuesta para el overlay
-        setResponse({ alerts });
+  // Toma screenshot y envía al WS
+  const sendFrame = () => {
+    if (webcamRef.current && wsRef.current?.readyState === 1) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) wsRef.current.send(JSON.stringify({ image: imageSrc }));
+    }
+  };
 
-        alerts.forEach(alert => {
-          // 1) Parseamos el frame (es un string JSON)
-          let parsed;
-          try {
-            parsed = JSON.parse(alert.frame);
-          } catch {
-            console.warn("alert.frame no es JSON, usamos raw:", alert.frame);
-            parsed = { image: alert.frame };
-          }
-          let imageData = parsed.image;
-          // Si vino como data URI, separamos el prefix
-          if (imageData.startsWith('data:')) {
-            imageData = imageData.split(',')[1];
-          }
+  // Procesa mensajes recibidos
+  const handleMessage = ({ data }) => {
+    try {
+      const { alerts } = JSON.parse(data);
+      if (!Array.isArray(alerts)) return;
+      setResponse({ alerts });
 
-          //descarga automática
-          // const link = document.createElement("a");
-          // link.href = `data:image/jpeg;base64,${imageData}`;
-          // const ts = new Date(alert.timestamp)
-          //   .toISOString()
-          //   .replace(/[:.]/g, "-");
-          // link.download = `alert_${alert.id}_${ts}.jpg`;
-          // document.body.appendChild(link);
-          // link.click();
-          // document.body.removeChild(link);
+      alerts.forEach(alert => {
+        // procesar frame
+        let parsed;
+        try { parsed = JSON.parse(alert.frame); }
+        catch { parsed = { image: alert.frame }; }
+        let imageData = parsed.image.startsWith('data:')
+          ? parsed.image.split(',')[1]
+          : parsed.image;
 
-          // 3) Sonido de alerta
-          const audio = audioRef.current;
-          audio.currentTime = 0;
-          audio.play().catch(() => {
-            console.warn('Interacción previa requerida para reproducir sonido');
-          });
+        // sonido
+        const audio = audioRef.current;
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
 
-          // 4) Notificar al padre
-          onNewAlert && onNewAlert(alert);
+        // notificar padre
+        onNewAlert?.(alert);
 
-        //ENVIAR ALERTA A BACKEND
-
+        // enviar alerta al backend
         fetch('http://localhost:3001/service/audit/alert', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: localStorage.getItem('email'),
             alertId: alert.id,
             type: alert.type,
             description: alert.description,
-            frame: alert.frame, // Enviamos la imagen en base64
+            frame: alert.frame,
           }),
-        }).catch((err) => {
-          console.error("Error enviando alerta al backend:", err);
-        });
-        }); 
-      } catch (err) {
-        console.error("Error procesando mensaje WS:", err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
-    ws.onclose = () => {
-      console.log("WebSocket cerrado");
-      if (captureInterval) clearInterval(captureInterval);
-    };
-
-    // Cleanup al desmontar
-    return () => {
-      if (captureInterval) clearInterval(captureInterval);
-      ws.close();
-    };
-  }, []);
+        }).catch(err => console.error("Error al enviar alerta:", err));
+      });
+    } catch (err) {
+      console.error("Error procesando mensaje WS:", err);
+    }
+  };
 
   const camKey = JSON.stringify(constraints);
 
