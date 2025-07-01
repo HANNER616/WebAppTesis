@@ -25,7 +25,7 @@ pool.on('error', (err, client) => {
 
 pool.connect()
   .then(client => {
-    console.log('Connected to the database (auth service)');
+    console.log('Connected to the database (audit service)');
     client.release(); // Libera el cliente de vuelta al pool
   })
   .catch(err => console.error('Database connection error:', err.stack));

@@ -2,6 +2,9 @@
 
 from fastapi import FastAPI, WebSocket
 import uvicorn
+from datetime import datetime, timedelta
+
+
 
 app = FastAPI()
 
@@ -16,6 +19,7 @@ async def video_stream(websocket: WebSocket):
             # Espera texto (el cliente envía JSON con { image: "<base64>" })
             msg = await websocket.receive_text()
             frame_count += 1
+            
 
             if frame_count >= 25:
                 frame_count = 0
@@ -24,7 +28,7 @@ async def video_stream(websocket: WebSocket):
                     {
                         "id": 1,
                         "type": "motion",
-                        "timestamp": "2025-10-01T12:00:00Z",
+                        "timestamp": (datetime.utcnow() - timedelta(hours=5)).isoformat() + "Z",
                         "description": "Movimiento sospechoso detectado en la cámara",
                         "frame" : msg
                     }

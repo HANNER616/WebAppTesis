@@ -1,11 +1,12 @@
 // components/Webcam.jsx.jsx
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, use } from "react";
 import Webcam from "react-webcam";
 
-const videoConstraints = {
+const DEFAULT_CONSTRAINTS = {
   width: 1280,
   height: 720,
   facingMode: "user",
+  frameRate: { exact: 30 },
 };
 
 // components/Webcam.jsx
@@ -20,6 +21,8 @@ const CameraComponent = ({ onNewAlert }) => {
 
   const webcamRef = useRef(null);
   const [response, setResponse] = useState(null);
+  const [constraints, setConstraints] = useState(DEFAULT_CONSTRAINTS);
+
 
   useEffect(() => {
     // Una llamada “vacía” a play() tras un click desbloquea el autoplay API
@@ -31,9 +34,38 @@ const CameraComponent = ({ onNewAlert }) => {
     return () => window.removeEventListener('click', unlock);
   }, []);
 
-  // inicializar el audioRef con el sonido 
+
   useEffect(() => {
 
+     const raw = localStorage.getItem("cameraSettings");
+    if (!raw) return;
+    const loaded = JSON.parse(raw);
+
+    // extrae el string correcto de deviceId (si estaba anidado)
+    let id = typeof loaded.deviceId === "string"
+      ? loaded.deviceId
+      : loaded.deviceId?.exact?.exact ?? loaded.deviceId?.exact;
+
+    const normalized = {
+      width:  loaded.width,
+      height: loaded.height,
+      ...(loaded.frameRate && { frameRate: loaded.frameRate }),
+      ...(id &&           { deviceId: { exact: id } }),
+      ...(loaded.facingMode && { facingMode: loaded.facingMode })
+    };
+
+    setConstraints(normalized);
+
+
+
+
+   
+
+  }, []);
+
+
+  useEffect(() => {
+   
     audioRef.current = new Audio(alertSound);
 
 
@@ -79,16 +111,16 @@ const CameraComponent = ({ onNewAlert }) => {
             imageData = imageData.split(',')[1];
           }
 
-          // 2) Forzamos descarga automática
-          const link = document.createElement("a");
-          link.href = `data:image/jpeg;base64,${imageData}`;
-          const ts = new Date(alert.timestamp)
-            .toISOString()
-            .replace(/[:.]/g, "-");
-          link.download = `alert_${alert.id}_${ts}.jpg`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          //descarga automática
+          // const link = document.createElement("a");
+          // link.href = `data:image/jpeg;base64,${imageData}`;
+          // const ts = new Date(alert.timestamp)
+          //   .toISOString()
+          //   .replace(/[:.]/g, "-");
+          // link.download = `alert_${alert.id}_${ts}.jpg`;
+          // document.body.appendChild(link);
+          // link.click();
+          // document.body.removeChild(link);
 
           // 3) Sonido de alerta
           const audio = audioRef.current;
@@ -99,7 +131,25 @@ const CameraComponent = ({ onNewAlert }) => {
 
           // 4) Notificar al padre
           onNewAlert && onNewAlert(alert);
+
+        //ENVIAR ALERTA A BACKEND
+
+        fetch('http://localhost:3001/service/audit/alert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: localStorage.getItem('email'),
+            alertId: alert.id,
+            type: alert.type,
+            description: alert.description,
+            frame: alert.frame, // Enviamos la imagen en base64
+          }),
+        }).catch((err) => {
+          console.error("Error enviando alerta al backend:", err);
         });
+        }); 
       } catch (err) {
         console.error("Error procesando mensaje WS:", err);
       }
@@ -121,13 +171,16 @@ const CameraComponent = ({ onNewAlert }) => {
     };
   }, []);
 
+  const camKey = JSON.stringify(constraints);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <Webcam
+        key={camKey}
         ref={webcamRef}
         audio={false}
         screenshotFormat="image/jpeg"
-        videoConstraints={videoConstraints}
+        videoConstraints={constraints}
         style={{ width: "100%", height: "100%" }}
       />
       {response && (
@@ -141,7 +194,7 @@ const CameraComponent = ({ onNewAlert }) => {
           borderRadius: 4,
           fontSize: 12,
         }}>
-          
+
         </div>
       )}
     </div>

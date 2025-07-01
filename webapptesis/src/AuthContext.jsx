@@ -1,36 +1,88 @@
 // AuthContext.js
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
-// Crea el contexto
 const AuthContext = createContext();
 
-// Proveedor del contexto
 export const AuthProvider = ({ children }) => {
+  // Estado de si estamos autenticados
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Mientras comprobamos el token en el servidor
+  const [loading, setLoading] = useState(true);
+  // Guardamos también el valor crudo por si lo necesitas
+  const [token, setToken] = useState(null);
 
-  // Función para manejar el login
-  const login = () => {
+
+  // Función para verificar en backend
+  const verifyTokenOnServer = async (t) => {
+
+   
+    const res = await fetch('http://localhost:3000/service/auth/verify-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: t }),
+    });
+    return res.ok; // Devuelve true si el token es válido
+  };
+
+  // Efecto que corre sólo al montar el provider
+  useEffect(() => {
+    (async () => {
+      const t = localStorage.getItem('token');
+      console.log('Token recuperado del localStorage:', t);
+      if (!t) {
+        // No había token
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const valid = await verifyTokenOnServer(t);
+        if (valid) {
+          // Si el backend dice que sigue válido, lo mantenemos
+          setToken(t);
+          setIsAuthenticated(true);
+        } else {
+          // Token expirado o inválido → desloguear
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        // Cualquier error de red o 401 → desloguear
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // login: guarda token en estado + localStorage
+  const login = (newToken, username, email) => {
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('username', username);
+    localStorage.setItem('email', email);
+
+    setToken(newToken);
+    
     setIsAuthenticated(true);
   };
 
-  // Función para manejar el logout (opcional)
+  // logout: borra todo
   const logout = () => {
-    setIsAuthenticated(false);
     localStorage.removeItem('token');
+    setToken(null);
+    setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personalizado para usar el contexto
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth debe usarse dentro de un AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth debe usarse dentro de un AuthProvider');
+  return ctx;
 };

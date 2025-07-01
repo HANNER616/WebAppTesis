@@ -10,7 +10,7 @@ import ConfigCamera from "./pages/ConfigCamera"
 import AppConfig from "./pages/AppConfig"
 import Auth from "./pages/Auth"
 import "./index.css"
-import Webcam from './components/Webcam'
+import WebcamComponent from './components/Webcam'
 import { openFrameInNewTab } from "./helpers";
 import { AlertsProvider, AlertsContext } from './AlertsContext'
 
@@ -20,16 +20,23 @@ import { AlertsProvider, AlertsContext } from './AlertsContext'
 
 // Componente para proteger rutas
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth(); // Usa el contexto
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
+  const { isAuthenticated, loading } = useAuth(); // Usa el contexto
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span>Cargando sesión…</span>
+      </div>
+    );
   }
-  return children;
+
+  return isAuthenticated ? children : <Navigate to="/auth" replace />;
 };
 
 
 function App() {
-
+  console.log("token:", localStorage.getItem('token'));
+  console.log("email:", localStorage.getItem('email'));
+  console.log("username:", localStorage.getItem('username'));
 
   return (
     <AuthProvider>
@@ -208,14 +215,7 @@ function HomePage() {
         <h2 className="text-xl font-semibold mb-4">Vista de Cámara</h2>
         <div className="aspect-video bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
           {showWebcam ? (
-            <Webcam
-              ref={webcamRef}
-              onNewAlert={handleNewAlert}
-              className="h-full w-full object-cover"
-              audio={false}
-              screenshotFormat="image/jpeg"
-              videoConstraints={{ facingMode: 'user' }}
-            />
+            <WebcamComponent onNewAlert={handleNewAlert}/>
           ) : (
             <Camera className="h-16 w-16 text-gray-400 dark:text-gray-500" />
           )}

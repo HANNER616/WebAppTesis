@@ -41,11 +41,18 @@ export default function Auth() {
       if (response.ok) {
         console.log('Login exitoso:', data);
 
-        localStorage.setItem('token', data.userInfo.token);
-        localStorage.setItem('username', data.userInfo.username); 
-        localStorage.setItem('email', data.userInfo.email);
+        //localStorage.setItem('token', data.userInfo.token);
+        //localStorage.setItem('username', data.userInfo.username); 
+        //localStorage.setItem('email', data.userInfo.email);
 
-        login();
+        const token = data.userInfo.token;
+        const username = data.userInfo.username;
+        const email = data.userInfo.email;
+
+
+        console.log('Token guardado en localStorage:', data.userInfo.token); //si imprime el toquen correctamente
+
+        login(token,username,email); // Llama a la función de login del contexto
         navigate("/") // Redirigir al dashboard después del login
 
       } else {

@@ -87,10 +87,23 @@ export default function ConfigCamera() {
   };
 
   const handleSave = async () => {
+    const { width, height } = RESOLUTION_MAP[resolution];
+
+
+    const constraints = {
+    width,
+    height,
+    facingMode: "user",
+    // Puedes usar un valor fijo o un rango
+    frameRate: { exact: fps },            
+    // Sólo incluimos deviceId si ya lo tienes seleccionado
+    ...(deviceId && { deviceId: { exact: deviceId } })
+  };
+
     await applyWithFallback(deviceId, resolution, fps);
     localStorage.setItem('cameraSettings',
-      JSON.stringify({ deviceId, resolution, fps })
-    );
+      JSON.stringify(constraints));
+    
     setMessage(prev => prev + ' · Guardado.');
     console.log("cameraSettings:", localStorage.getItem('cameraSettings'));
   };
@@ -180,15 +193,9 @@ export default function ConfigCamera() {
         />
       </div>
 
-      {/* Preview y Guardar */}
+      {/* Guardar */}
       <div className="space-y-4">
-        <Webcam
-          ref={webcamRef}
-          audio={false}
-          screenshotFormat="image/jpeg"
-          videoConstraints={constraints}
-          className="w-full aspect-video bg-black rounded"
-        />
+        
         <button
           onClick={handleSave}
           className="
