@@ -20,40 +20,48 @@ export default function AlertsSummary() {
 
 
   useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const resp = await api.get('/get-alerts', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        // guardo todas las alertas
+        setAllAlerts(resp.data);
+        // muestro por defecto todas
+        setDisplayedAlerts(resp.data);
+        // extraigo nombres únicos de examen
+        setExamNames(
+          [...new Set(resp.data.map(a => a.exam_name).filter(Boolean))]
+        );
+      } catch (err) {
+        console.error('❌ Error al cargar alertas:', err);
+      }
+    };
 
-    console.log('🔄 useEffect de AlertsSummary ejecutado', { alerts });
-    //setDisplayedAlerts(alerts);
-    
+    fetchAlerts();
+  }, []);
 
+  const handleFilter = () => {
+  if (!startDate || !endDate) return;
 
+  // Creamos objetos Date para comparar
+  const start = new Date(`${startDate}T00:00:00-05:00`);
+  const end   = new Date(`${endDate}T23:59:59-05:00`);
 
-  }, [alerts]);
+  // Filtramos sobre allAlerts (las que cargaste en el useEffect inicial)
+  const filteredByDate = allAlerts.filter(a => {
+    const alertTime = new Date(a.time ?? a.timestamp);
+    return alertTime >= start && alertTime <= end;
+  });
 
-  const handleFilter = async () => {
-    console.log('🔍 handleFilter invoked', { startDate, endDate });
-    if (!startDate || !endDate) {
-      console.warn('❗ Falta startDate o endDate');
-      return;
-    }
-
-    const start = `${startDate}T00:00:00-05:00`;
-    const end   = `${endDate}T23:59:59-05:00`;
-
-    try {
-      const resp = await api.get('/show-alerts', {
-        params: { startDate: start, endDate: end }
-      });
-      console.log('📨 show-alerts response:', resp.data);
-      setDisplayedAlerts(resp.data);
-      setAllAlerts(resp.data);
-      const uniqueExamNames = [...new Set(resp.data.map(a => a.exam_name).filter(Boolean))];
-      setExamNames(uniqueExamNames);
-
-      setSelectedExam('');
-    } catch (err) {
-      console.error('❌ Error en show-alerts:', err);
-    }
-  };
+  // Actualizamos estados
+  setDisplayedAlerts(filteredByDate);
+  setExamNames([...new Set(filteredByDate.map(a => a.exam_name).filter(Boolean))]);
+  setSelectedExam('');  // reiniciamos el select de examen
+};
 
   const handleExamFilter = (examName) => {
   setSelectedExam(examName);
@@ -141,24 +149,33 @@ export default function AlertsSummary() {
 
       {/* Controles de filtro */}
       <div className="flex flex-wrap items-end gap-4 mb-6">
+        {/* Fecha inicio */}
         <div className="flex flex-col">
-          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">Fecha inicio</label>
+          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            Fecha inicio
+          </label>
           <input
             type="date"
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
+
+        {/* Fecha fin */}
         <div className="flex flex-col">
-          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">Fecha fin</label>
+          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            Fecha fin
+          </label>
           <input
             type="date"
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
+
+        {/* Botón Filtrar por Fecha */}
         <button
           onClick={handleFilter}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition"

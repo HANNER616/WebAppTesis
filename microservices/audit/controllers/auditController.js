@@ -44,17 +44,14 @@ const logAlert = async (req, res) => {
 };
 
 
-const getByDateRange = async (req, res, next) => {
+const getAllByUser = async (req, res, next) => {
   try {
-    const userId    = req.user.id;                // viene del middleware
-    const { startDate, endDate } = req.query;
-    console.log(
-      '🔍 getByDateRange for userId=',
-      userId, 'from', startDate, 'to', endDate
-    );
-    const audits = await Audit.getByDateRangeByUser(
-      userId, startDate, endDate
-    );
+    const userId = req.user.id;  // viene del middleware
+    console.log('🔍 getAllByUser for userId=', userId);
+
+    // Llamamos a la nueva función que no requiere fechas
+    const audits = await Audit.getAllByUser(userId);
+
     console.log('📨 returning audits:', audits);
     return res.status(200).json(audits);
   } catch (error) {
@@ -101,7 +98,7 @@ const getFrame = async (req, res, next) => {
 module.exports = {
     logAlert,
     createExamSession,
-    getByDateRange,
+    getAllByUser,
     getFrame
     
 };

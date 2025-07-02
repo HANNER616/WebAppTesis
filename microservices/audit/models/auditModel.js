@@ -33,28 +33,55 @@ class Audit {
     }
 
 
-    static async getByDateRangeByUser(userId, startDate, endDate) {
-        const result = await pool.query(
-            `
-    SELECT 
-      aa.id,
-      aa.user_id,
-      aa.type,
-      aa.description,
-      aa.frame->>'dataURL'   AS frame,
-      aa.time,
-      es.name               AS exam_name
-    FROM alerts_audit AS aa
-    JOIN exam_sessions AS es
-      ON aa.session_id = es.id
-    WHERE aa.user_id = $1
-      AND aa.time BETWEEN $2 AND $3
-    ORDER BY aa.time ASC;
-    `,
-            [userId, startDate, endDate]
-        );
-        return result.rows;
-    }
+    // static async getByDateRangeByUser(userId, startDate, endDate) {
+    //     const result = await pool.query(
+    //         `
+    // SELECT 
+    //   aa.id,
+    //   aa.user_id,
+    //   aa.type,
+    //   aa.description,
+    //   aa.frame->>'dataURL'   AS frame,
+    //   aa.time,
+    //   es.name               AS exam_name
+    // FROM alerts_audit AS aa
+    // JOIN exam_sessions AS es
+    //   ON aa.session_id = es.id
+    // WHERE aa.user_id = $1
+    //   AND aa.time BETWEEN $2 AND $3
+    // ORDER BY aa.time ASC;
+    // `,
+    //         [userId, startDate, endDate]
+    //     );
+    //     return result.rows;
+    // }
+
+    static async getAllByUser(userId) {
+    const result = await pool.query(
+        `
+        SELECT 
+          aa.id,
+          aa.user_id,
+          aa.type,
+          aa.description,
+          aa.frame->>'dataURL' AS frame,
+          aa.time,
+          es.name AS exam_name
+        FROM alerts_audit AS aa
+        JOIN exam_sessions AS es
+          ON aa.session_id = es.id
+        WHERE aa.user_id = $1
+        ORDER BY aa.time ASC;
+        `,
+        [userId]
+    );
+    return result.rows;
+}
+
+
+    
+
+
 
 
     static async getFrameById(id, userId) {
