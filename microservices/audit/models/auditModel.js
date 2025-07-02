@@ -57,8 +57,8 @@ class Audit {
     // }
 
     static async getAllByUser(userId) {
-    const result = await pool.query(
-        `
+        const result = await pool.query(
+            `
         SELECT 
           aa.id,
           aa.user_id,
@@ -73,45 +73,147 @@ class Audit {
         WHERE aa.user_id = $1
         ORDER BY aa.time ASC;
         `,
-        [userId]
-    );
-    return result.rows;
-}
+            [userId]
+        );
+        return result.rows;
+    }
+
+    //     static async getByUserPaginated(userId, limit, offset) {
+    //         const q = `
+    //     SELECT aa.id, aa.user_id, aa.type, aa.description,
+    //            aa.frame->>'dataURL' AS frame, aa.time,
+    //            es.name AS exam_name
+    //     FROM alerts_audit aa
+    //     JOIN exam_sessions es ON aa.session_id = es.id
+    //     WHERE aa.user_id = $1
+    //     ORDER BY aa.time ASC
+    //     LIMIT $2 OFFSET $3;
+    //   `;
+    //         const result = await pool.query(q, [userId, limit, offset]);
+    //         return result.rows;
+    //     }
+
+    //     static async countByUser(userId) {
+    //         const res = await pool.query(
+    //             'SELECT COUNT(*)::int AS count FROM alerts_audit WHERE user_id = $1',
+    //             [userId]
+    //         );
+    //         return res.rows[0];
+    //     }
+
+    static async getByUserPaginated(userId, limit, offset, startDate, endDate, examName) {
+        const clauses = ['aa.user_id = $1'];
+        const params = [userId];
+        let idx = 2;
+
+        // Filtro por rango de tiempo si se proporcionan fechas
+        if (startDate && endDate) {
+            clauses.push(`aa.time BETWEEN $${idx} AND $${idx + 1}`);
+            params.push(startDate, endDate);
+            idx += 2;
+        }
+
+        // Filtro por nombre de examen si se proporciona
+        if (examName) {
+            clauses.push(`es.name = $${idx}`);
+            params.push(examName);
+            idx += 1;
+        }
+
+        // Montamos la consulta final
+        const where = clauses.length
+            ? 'WHERE ' + clauses.join(' AND ')
+            : '';
+
+        const sql = `
+      SELECT 
+        aa.id,
+        aa.user_id,
+        aa.type,
+        aa.description,
+        aa.frame->>'dataURL' AS frame,
+        aa.time,
+        es.name AS exam_name
+      FROM alerts_audit AS aa
+      JOIN exam_sessions AS es
+        ON aa.session_id = es.id
+      ${where}
+      ORDER BY aa.time ASC
+      LIMIT $${idx} OFFSET $${idx + 1};
+    `;
+        params.push(limit, offset);
+
+        const result = await pool.query(sql, params);
+        return result.rows;
+    }
 
 
-    
+    static async countByUser(userId, startDate, endDate, examName) {
+        const clauses = ['user_id = $1'];
+        const params = [userId];
+        let idx = 2;
+
+        if (startDate && endDate) {
+            clauses.push(`time BETWEEN $${idx} AND $${idx + 1}`);
+            params.push(startDate, endDate);
+            idx += 2;
+        }
+        if (examName) {
+            clauses.push(`session_id IN (
+        SELECT id FROM exam_sessions WHERE name = $${idx}
+      )`);
+            params.push(examName);
+        }
+
+        const where = clauses.length
+            ? 'WHERE ' + clauses.join(' AND ')
+            : '';
+
+        const sql = `
+      SELECT COUNT(*)::int AS count
+      FROM alerts_audit
+      ${where};
+    `;
+        const result = await pool.query(sql, params);
+        return result.rows[0].count;
+    }
+
+
+
+
+
 
 
 
 
     static async getFrameById(id, userId) {
-        const result = await pool.query(
-            `SELECT frame
+    const result = await pool.query(
+        `SELECT frame
          FROM alerts_audit
         WHERE id = $1
           AND user_id = $2`,
-            [id, userId]
-        );
-        const row = result.rows[0];
-        if (!row) return null;
+        [id, userId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
 
-        // row.frame es tu JSONB: puede ser un string, un objeto, etc.
-        const frame = row.frame;
+    // row.frame es tu JSONB: puede ser un string, un objeto, etc.
+    const frame = row.frame;
 
-        // Caso 1: ya era una cadena Data-URL
-        if (typeof frame === 'string' && frame.startsWith('data:')) {
-            return frame;
-        }
-        // Caso 2: era un objeto con clave dataURL, image o src
-        if (typeof frame === 'object') {
-            return frame.dataURL || frame.image || frame.src || null;
-        }
-        // Caso 3: era un string base64 puro
-        if (typeof frame === 'string') {
-            return `data:image/jpeg;base64,${frame}`;
-        }
-        return null;
+    // Caso 1: ya era una cadena Data-URL
+    if (typeof frame === 'string' && frame.startsWith('data:')) {
+        return frame;
     }
+    // Caso 2: era un objeto con clave dataURL, image o src
+    if (typeof frame === 'object') {
+        return frame.dataURL || frame.image || frame.src || null;
+    }
+    // Caso 3: era un string base64 puro
+    if (typeof frame === 'string') {
+        return `data:image/jpeg;base64,${frame}`;
+    }
+    return null;
+}
 
 
 

@@ -60,6 +60,40 @@ const getAllByUser = async (req, res, next) => {
   }
 };
 
+const getAlertsPaginated = async (req, res) => {
+  try {
+    const userId   = req.user.id;
+    const page     = parseInt(req.query.page)  || 1;
+    const limit    = parseInt(req.query.limit) || 20;
+    const offset   = (page - 1) * limit;
+    const startDate = req.query.startDate;    // opcional
+    const endDate   = req.query.endDate;      // opcional
+    const examName  = req.query.examName;     // opcional
+
+    // Datos paginados
+    const data  = await Audit.getByUserPaginated(
+      userId,
+      limit,
+      offset,
+      startDate,
+      endDate,
+      examName
+    );
+    // Total para calcular totalPages
+    const total = await Audit.countByUser(
+      userId,
+      startDate,
+      endDate,
+      examName
+    );
+
+    return res.json({ data, total, page, limit });
+  } catch (err) {
+    console.error('Error en getAlertsLimited:', err);
+    return res.status(500).json({ message: 'Error fetching paginated alerts' });
+  }
+};
+
 
 const getFrame = async (req, res, next) => {
   try {
@@ -99,6 +133,7 @@ module.exports = {
     logAlert,
     createExamSession,
     getAllByUser,
+    getAlertsPaginated,
     getFrame
     
 };
