@@ -2,29 +2,45 @@
 
 const Audit = require('../models/auditModel'); // Asegúrate de que la ruta sea correcta
 
+const createExamSession = async (req, res) => {
+  const { sessionName } = req.body;
+  const email = req.user.email; // asumiendo que tu middleware de auth pone el email en req.user
+
+  try {
+    const sessionId = await Audit.createExamSession({ email, sessionName });
+    return res
+      .status(201)
+      .json({ message: 'Exam session created', sessionId });
+  } catch (error) {
+    console.error('Error creating exam session:', error);
+    return res
+      .status(500)
+      .json({ message: 'Error creating exam session' });
+  }
+};
+
 
 const logAlert = async (req, res) => {
+  const { sessionId, type, description, frame } = req.body;
+  const email = req.user.email;
 
-    const { email, alertId, type, description, frame } = req.body;
-
-    try {
-
-        const auditLog = await Audit.logAlert({
-            email,
-            alertId,
-            type,
-            description,
-            frame
-        });
-
-        return res.status(201).json({ message: 'Alert logged successfully', auditLog });
-        
-    } catch (error) {
-
-        console.error('Error logging alert:', error);
-        return res.status(500).json({ message: 'Error logging alert' });
-        
-    }
+  try {
+    const auditLog = await Audit.logAlert({
+      email,
+      sessionId,
+      type,
+      description,
+      frame
+    });
+    return res
+      .status(201)
+      .json({ message: 'Alert logged successfully', auditLog });
+  } catch (error) {
+    console.error('Error logging alert:', error);
+    return res
+      .status(500)
+      .json({ message: 'Error logging alert' });
+  }
 };
 
 
@@ -84,6 +100,7 @@ const getFrame = async (req, res, next) => {
 
 module.exports = {
     logAlert,
+    createExamSession,
     getByDateRange,
     getFrame
     

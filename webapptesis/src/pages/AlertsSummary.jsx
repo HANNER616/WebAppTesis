@@ -14,11 +14,16 @@ export default function AlertsSummary() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [displayedAlerts, setDisplayedAlerts] = useState([]);
+  const [selectedExam, setSelectedExam] = useState('');
+  const [examNames, setExamNames] = useState([]);
+  const [allAlerts, setAllAlerts] = useState([]);
+
 
   useEffect(() => {
 
-
-    setDisplayedAlerts(alerts);
+    console.log('🔄 useEffect de AlertsSummary ejecutado', { alerts });
+    //setDisplayedAlerts(alerts);
+    
 
 
 
@@ -40,10 +45,25 @@ export default function AlertsSummary() {
       });
       console.log('📨 show-alerts response:', resp.data);
       setDisplayedAlerts(resp.data);
+      setAllAlerts(resp.data);
+      const uniqueExamNames = [...new Set(resp.data.map(a => a.exam_name).filter(Boolean))];
+      setExamNames(uniqueExamNames);
+
+      setSelectedExam('');
     } catch (err) {
       console.error('❌ Error en show-alerts:', err);
     }
   };
+
+  const handleExamFilter = (examName) => {
+  setSelectedExam(examName);
+  if (examName === '') {
+    setDisplayedAlerts(allAlerts);
+  } else {
+        setDisplayedAlerts(allAlerts.filter(a => a.exam_name === examName));
+
+  }
+};
 
   const handleDownload = async () => {
     const BACKEND = 'http://localhost:3001';
@@ -63,7 +83,7 @@ export default function AlertsSummary() {
       const row = ws.addRow({
         time:        a.time ?? a.timestamp,
         description: a.description,
-        type:        a.type,
+        type:        a.type
       });
 
       const cell = ws.getCell(`D${row.number}`);
@@ -145,6 +165,21 @@ export default function AlertsSummary() {
         >
           Filtrar
         </button>
+        <div className="flex flex-col ml-4">
+  <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">Filtrar por examen</label>
+  <select
+    value={selectedExam}
+    onChange={e => handleExamFilter(e.target.value)}
+    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+  >
+    <option value="">Todos los exámenes</option>
+    {examNames.map((exam, idx) => (
+      <option key={idx} value={exam}>
+        {exam}
+      </option>
+    ))}
+  </select>
+</div>
         <button
           onClick={handleDownload}
           className="ml-auto flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition"

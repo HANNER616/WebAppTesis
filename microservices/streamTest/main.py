@@ -26,7 +26,6 @@ async def video_stream(websocket: WebSocket):
                 # Aquí podrías generar alertas de prueba
                 alerts = [
                     {
-                        "id": 1,
                         "type": "motion",
                         "timestamp": (datetime.utcnow() - timedelta(hours=5)).isoformat() + "Z",
                         "description": "Movimiento sospechoso detectado en la cámara",
