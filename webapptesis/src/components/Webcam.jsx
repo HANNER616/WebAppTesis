@@ -23,17 +23,29 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
   const webcamRef = useRef(null);
   const [response, setResponse] = useState(null);
   const [constraints, setConstraints] = useState(DEFAULT_CONSTRAINTS);
+  const soundOn = localStorage.getItem("sonidoAlertas") === "true";
+  const delaySec = parseInt(localStorage.getItem("alertDelay") || "0", 10)
 
 
-  useEffect(() => {
-    // Una llamada “vacía” a play() tras un click desbloquea el autoplay API
-    const unlock = () => {
-      audioRef.current.play().catch(() => { });
-      window.removeEventListener('click', unlock);
-    };
-    window.addEventListener('click', unlock);
-    return () => window.removeEventListener('click', unlock);
-  }, []);
+
+  // useEffect(() => {
+    
+
+  //   const unlock = () => {
+  //     const audio = audioRef.current;
+  //     const originalVolume = audio.volume;
+  //     audio.volume = 0;
+      
+  //     audioRef.volume=0;
+  //     audioRef.current.play().catch(() => { });
+  //     audio.volume = originalVolume;
+      
+  //     window.removeEventListener("click", unlock);
+  //   };
+
+  //   window.addEventListener("click", unlock);
+  //   return () => window.removeEventListener("click", unlock);
+  // }, []);
 
 
   useEffect(() => {
@@ -145,9 +157,17 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
           : parsed.image;
 
         // sonido
-        const audio = audioRef.current;
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+        // const audio = audioRef.current;
+        // audio.currentTime = 0;
+        // audio.play().catch(() => { });
+
+
+        if (soundOn) {
+          setTimeout(() => {
+            audioRef.current.currentTime = 0
+            audioRef.current.play().catch(() => { })
+          }, delaySec * 1000)
+        }
 
         // notificar padre
         onNewAlert?.(alert);
@@ -155,7 +175,7 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
         // enviar alerta al backend
         fetch('http://localhost:3001/service/audit/alert', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json','Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
           body: JSON.stringify({
             sessionId: localStorage.getItem('sessionId'),
             type: alert.type,
@@ -163,6 +183,10 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
             frame: alert.frame,
           }),
         }).catch(err => console.error("Error al enviar alerta:", err));
+
+
+
+
       });
     } catch (err) {
       console.error("Error procesando mensaje WS:", err);
