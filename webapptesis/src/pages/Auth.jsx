@@ -13,6 +13,21 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const { login } = useAuth();
 
+  const logEvent = async (type) => {
+    try {
+      await fetch('http://localhost:3001/service/audit/user-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ type })
+      })
+    } catch (err) {
+      console.error('Error al loguear evento:', err)
+    }
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault()
     // llamada a un microservicio para autenticar al usuario
@@ -53,6 +68,7 @@ export default function Auth() {
         console.log('Token guardado en localStorage:', data.userInfo.token); //si imprime el toquen correctamente
 
         login(token,username,email); // Llama a la función de login del contexto
+        await logEvent('login')
         navigate("/") // Redirigir al dashboard después del login
 
       } else {
@@ -89,7 +105,6 @@ export default function Auth() {
 
       if (response.ok) {
         console.log('Signup succesfully:', data);
-
         setView("login")
 
       } else {

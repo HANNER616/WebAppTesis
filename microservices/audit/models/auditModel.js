@@ -102,47 +102,50 @@ class Audit {
     //     }
 
     static async getByUserPaginated(userId, limit, offset, startDate, endDate, examName) {
+        // 1) Montamos dinámicamente las cláusulas WHERE
         const clauses = ['aa.user_id = $1'];
         const params = [userId];
         let idx = 2;
 
-        // Filtro por rango de tiempo si se proporcionan fechas
+        // Filtro por rango de tiempo
         if (startDate && endDate) {
             clauses.push(`aa.time BETWEEN $${idx} AND $${idx + 1}`);
             params.push(startDate, endDate);
             idx += 2;
         }
 
-        // Filtro por nombre de examen si se proporciona
+        // Filtro por nombre de examen
         if (examName) {
             clauses.push(`es.name = $${idx}`);
             params.push(examName);
             idx += 1;
         }
 
-        // Montamos la consulta final
-        const where = clauses.length
-            ? 'WHERE ' + clauses.join(' AND ')
-            : '';
+        // Unimos las cláusulas
+        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
+        // 2) Construimos la consulta con placeholders para LIMIT y OFFSET
         const sql = `
-      SELECT 
-        aa.id,
-        aa.user_id,
-        aa.type,
-        aa.description,
-        aa.frame->>'dataURL' AS frame,
-        aa.time,
-        es.name AS exam_name
-      FROM alerts_audit AS aa
-      JOIN exam_sessions AS es
-        ON aa.session_id = es.id
-      ${where}
-      ORDER BY aa.time ASC
-      LIMIT $${idx} OFFSET $${idx + 1};
-    `;
+    SELECT
+      aa.id,
+      aa.user_id,
+      aa.type,
+      aa.description,
+      aa.frame->>'dataURL' AS frame,
+      aa.time,
+      es.name AS exam_name
+    FROM alerts_audit AS aa
+    JOIN exam_sessions AS es
+      ON aa.session_id = es.id
+    ${where}
+    ORDER BY aa.time ASC
+    LIMIT $${idx} OFFSET $${idx + 1};
+  `;
+
+        // 3) Agregamos limit y offset al array de parámetros
         params.push(limit, offset);
 
+        // 4) Ejecutamos y devolvemos filas
         const result = await pool.query(sql, params);
         return result.rows;
     }
@@ -179,6 +182,27 @@ class Audit {
     }
 
 
+    static async getExamNamesByUser(userId) {
+        const sql = `
+      SELECT DISTINCT es.name
+      FROM exam_sessions AS es
+      JOIN alerts_audit AS aa
+        ON aa.session_id = es.id
+      WHERE aa.user_id = $1
+      ORDER BY es.name;
+    `;
+        const res = await pool.query(sql, [userId]);
+        // res.rows = [ { name: 'Examen A' }, { name: 'Examen B' }, … ]
+        return res.rows.map(r => r.name);
+    }
+
+
+
+
+
+
+
+
 
 
 
@@ -187,33 +211,33 @@ class Audit {
 
 
     static async getFrameById(id, userId) {
-    const result = await pool.query(
-        `SELECT frame
+        const result = await pool.query(
+            `SELECT frame
          FROM alerts_audit
         WHERE id = $1
           AND user_id = $2`,
-        [id, userId]
-    );
-    const row = result.rows[0];
-    if (!row) return null;
+            [id, userId]
+        );
+        const row = result.rows[0];
+        if (!row) return null;
 
-    // row.frame es tu JSONB: puede ser un string, un objeto, etc.
-    const frame = row.frame;
+        // row.frame es tu JSONB: puede ser un string, un objeto, etc.
+        const frame = row.frame;
 
-    // Caso 1: ya era una cadena Data-URL
-    if (typeof frame === 'string' && frame.startsWith('data:')) {
-        return frame;
+        // Caso 1: ya era una cadena Data-URL
+        if (typeof frame === 'string' && frame.startsWith('data:')) {
+            return frame;
+        }
+        // Caso 2: era un objeto con clave dataURL, image o src
+        if (typeof frame === 'object') {
+            return frame.dataURL || frame.image || frame.src || null;
+        }
+        // Caso 3: era un string base64 puro
+        if (typeof frame === 'string') {
+            return `data:image/jpeg;base64,${frame}`;
+        }
+        return null;
     }
-    // Caso 2: era un objeto con clave dataURL, image o src
-    if (typeof frame === 'object') {
-        return frame.dataURL || frame.image || frame.src || null;
-    }
-    // Caso 3: era un string base64 puro
-    if (typeof frame === 'string') {
-        return `data:image/jpeg;base64,${frame}`;
-    }
-    return null;
-}
 
 
 
@@ -221,7 +245,21 @@ class Audit {
 
     //////
 
-
+    static async sendUserEvent({ userId, type, description, details }) {
+        const result = await pool.query(
+            `
+      INSERT INTO user_events (user_id, event_type)
+      VALUES ($1, $2)
+      RETURNING
+        id,
+        user_id,
+        event_type,
+        occurred_at;
+      `,
+            [userId, type]
+        );
+        return result.rows[0];
+    }
 
     //////
 

@@ -112,7 +112,22 @@ useEffect(() => {
   }
 }, [examActive])
 
-  const handleLogout = () => {
+  const logEvent = async (type) => {
+    try {
+      await fetch('http://localhost:3001/service/audit/user-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ type })
+      })
+    } catch (err) {
+      console.error('Error al loguear evento:', err)
+    }
+  }
+  const handleLogout = async () => {
+    await logEvent('logout')
     logout()
     setAlerts([])
     navigate("/auth")

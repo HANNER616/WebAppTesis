@@ -62,16 +62,16 @@ const getAllByUser = async (req, res, next) => {
 
 const getAlertsPaginated = async (req, res) => {
   try {
-    const userId   = req.user.id;
-    const page     = parseInt(req.query.page)  || 1;
-    const limit    = parseInt(req.query.limit) || 20;
-    const offset   = (page - 1) * limit;
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
     const startDate = req.query.startDate;    // opcional
-    const endDate   = req.query.endDate;      // opcional
-    const examName  = req.query.examName;     // opcional
-
+    const endDate = req.query.endDate;      // opcional
+    const examName = req.query.examName;     // opcional
+    console.log(`🔍 getAlertsPaginated userId=${userId} page=${page} limit=${limit} offset=${offset} startDate=${startDate} endDate=${endDate} examName=${examName}`);
     // Datos paginados
-    const data  = await Audit.getByUserPaginated(
+    const data = await Audit.getByUserPaginated(
       userId,
       limit,
       offset,
@@ -97,9 +97,9 @@ const getAlertsPaginated = async (req, res) => {
 
 const getFrame = async (req, res, next) => {
   try {
-    const { id }     = req.params;
-    const userId     = req.user.id;
-    const dataURL    = await Audit.getFrameById(id, userId);
+    const { id } = req.params;
+    const userId = req.user.id;
+    const dataURL = await Audit.getFrameById(id, userId);
 
     //console.log(`🔍 getFrame id=${id} userId=${userId} ➞ dataURL:`, dataURL?.slice(0,50));
 
@@ -109,17 +109,42 @@ const getFrame = async (req, res, next) => {
 
     // separa el mime y el base64
     const [meta, b64] = dataURL.split(',');
-    const m           = meta.match(/^data:(image\/\w+);base64$/);
+    const m = meta.match(/^data:(image\/\w+);base64$/);
     if (!m) {
       return res.status(500).send('Formato de Data-URL inválido');
     }
-    const mime    = m[1];
-    const buf     = Buffer.from(b64, 'base64');
+    const mime = m[1];
+    const buf = Buffer.from(b64, 'base64');
 
     res.set('Content-Type', mime);
     res.send(buf);
   } catch (err) {
     next(err);
+  }
+};
+
+
+const getExamNames = async (req, res) => {
+  try {
+    const userId = req.user.id;               // viene del JWT middleware
+    const names = await Audit.getExamNamesByUser(userId);
+    return res.json(names);                  // => ["Examen A","Examen B",…]
+  } catch (err) {
+    console.error('Error en getExamNames:', err);
+    return res.status(500).json({ message: 'Error fetching exam names' });
+  }
+};
+
+ const createUserEvent = async (req, res) => {
+  try {
+    const userId = req.user.id;      
+    const { type } = req.body;      
+    const newEvent = await Audit.sendUserEvent({ userId, type });
+    // newEvent tendrá { id, user_id, event_type, occurred_at }
+    return res.status(201).json(newEvent);
+  } catch (err) {
+    console.error('Error al crear UserEvent:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 
@@ -130,10 +155,12 @@ const getFrame = async (req, res, next) => {
 
 
 module.exports = {
-    logAlert,
-    createExamSession,
-    getAllByUser,
-    getAlertsPaginated,
-    getFrame
-    
+  logAlert,
+  createExamSession,
+  getAllByUser,
+  getExamNames,
+  getAlertsPaginated,
+  getFrame,
+  createUserEvent
+
 };

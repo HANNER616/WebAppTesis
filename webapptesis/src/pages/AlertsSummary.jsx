@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Download, Search } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import api from '../lib/api';
@@ -7,122 +7,139 @@ import api from '../lib/api';
 export default function AlertsSummary() {
   // Paginación
   const [alerts, setAlerts] = useState([]);
-  const [page, setPage]     = useState(1);
-  const [limit, setLimit]   = useState(20);
-  const [total, setTotal]   = useState(0);
-  const totalPages          = Math.ceil(total / limit);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const totalPages = Math.ceil(total / limit);
 
   // Inputs de fecha
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate]     = useState('');
+  const [endDate, setEndDate] = useState('');
   // Filtros aplicados (se usan en el pipeline)
   const [filterStart, setFilterStart] = useState('');
-  const [filterEnd, setFilterEnd]     = useState('');
+  const [filterEnd, setFilterEnd] = useState('');
 
-  // Dropdown examen
-  const [selectedExam, setSelectedExam] = useState('');
-  const [examNames, setExamNames]       = useState([]);
+  const [selectedExam, setSelectedExam] = useState(null); // input
+  const [filterExam, setFilterExam] = useState(null); // pipeline
+
+
+  const [examNames, setExamNames] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const examFilterRef = useRef(null);
+
+
+
+  const [allExamNames, setAllExamNames] = useState([]);
+  // ▷ Para la búsqueda en el dropdown
+  const [examSearch, setExamSearch] = useState('');
 
   // Resultado final tras aplicar filtros
   const [displayedAlerts, setDisplayedAlerts] = useState([]);
 
   // 1) Fetch paginado
   useEffect(() => {
-  const fetchPage = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      // Armamos los params dinámicamente:
-      const params = { page, limit };
-      if (filterStart && filterEnd) {
-        params.startDate = `${filterStart}T00:00:00-05:00`;
-        params.endDate   = `${filterEnd}T23:59:59-05:00`;
+    const fetchPage = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        // Armamos los params dinámicamente:
+        const params = { page, limit };
+        if (filterStart && filterEnd) {
+          params.startDate = `${filterStart}T00:00:00-05:00`;
+          params.endDate = `${filterEnd}T23:59:59-05:00`;
+        }
+        if (selectedExam) {
+          params.examName = selectedExam;
+        }
+
+        const resp = await api.get('/get-alerts-limited', {
+          headers: { Authorization: `Bearer ${token}` },
+          params
+        });
+
+        setAlerts(resp.data.data);
+        setTotal(resp.data.total);
+        setDisplayedAlerts(resp.data.data); // Inicialmente muestra todo
+        // Opcional: si quieres recalcular dropdown de examenes desde cada página:
+        setExamNames(
+          [...new Set(resp.data.data.map(a => a.exam_name).filter(Boolean))]
+        );
+      } catch (err) {
+        console.error('❌ Error al cargar página:', err);
       }
-      if (selectedExam) {
-        params.examName = selectedExam;
-      }
+    };
+    fetchPage();
+  }, [page, limit, filterStart, filterEnd, filterExam]);
 
-      const resp = await api.get('/get-alerts-limited', {
-        headers: { Authorization: `Bearer ${token}` },
-        params
-      });
-
-      setAlerts(resp.data.data);
-      setTotal(resp.data.total);
-      // Opcional: si quieres recalcular dropdown de examenes desde cada página:
-      setExamNames(
-        [...new Set(resp.data.data.map(a => a.exam_name).filter(Boolean))]
-      );
-    } catch (err) {
-      console.error('❌ Error al cargar página:', err);
-    }
-  };
-  fetchPage();
-}, [page, limit, filterStart, filterEnd, selectedExam]);
-
-  // 2) Pipeline de filtros: fecha → examenes disponibles → examen → resultado
   useEffect(() => {
-    // a) Filtrar por fecha (si existe rango aplicado)
-    let working = alerts;
-    if (filterStart && filterEnd) {
-      const start = new Date(`${filterStart}T00:00:00-05:00`);
-      const end   = new Date(`${filterEnd}T23:59:59-05:00`);
-      working = working.filter(a => {
-        const t = new Date(a.time ?? a.timestamp);
-        return t >= start && t <= end;
-      });
-    }
+    const handleClickOutside = e => {
+      if (examFilterRef.current && !examFilterRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    // b) Recalcular opciones de examen según 'working'
-    const availableExams = [
-      ...new Set(working.map(a => a.exam_name).filter(Boolean))
-    ];
-    setExamNames(availableExams);
 
-    // c) Si el examen seleccionado ya no existe en options, lo limpio
-    if (selectedExam && !availableExams.includes(selectedExam)) {
-      setSelectedExam('');
-    }
+  useEffect(() => {
+    const fetchExamNames = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const resp = await api.get('/get-exam-names', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setAllExamNames(resp.data);  // ["Ex A","Ex B",…]
+      } catch (err) {
+        console.error('Error al cargar exam names:', err);
+      }
+    };
+    fetchExamNames();
+  }, []);
 
-    // d) Filtrar por examen (si hay uno seleccionado)
-    if (selectedExam) {
-      working = working.filter(a => a.exam_name === selectedExam);
-    }
 
-    // e) Guardar resultado
-    setDisplayedAlerts(working);
-  }, [alerts, filterStart, filterEnd, selectedExam]);
 
-  // 3) Manejo de clic en “Filtrar” para fechas
+  // Manejo de clic en “Filtrar” para fechas
   const handleFilter = () => {
-    if (!startDate || !endDate) return;
-    setFilterStart(startDate);
-    setFilterEnd(endDate);
-  };
+  
+  setFilterExam(selectedExam);
+
+  
+  setFilterStart(startDate || null);
+  setFilterEnd  (endDate   || null);
+
+  
+  setPage(1);
+  setExamSearch('');
+  setDropdownOpen(false);
+};
 
   // 4) Dropdown examen solo actualiza selección
-  const handleExamFilter = examName => {
-    setSelectedExam(examName);
+  const handleExamFilter = (examName) => {
+    setSelectedExam(examName); // null = sin filtro
+    setPage(1);
+    setDropdownOpen(false);
+    setExamSearch('');         // limpia la búsqueda
   };
 
   // 5) Download Excel (igual que antes)
   const handleDownload = async () => {
     const BACKEND = 'http://localhost:3001';
-    const token   = localStorage.getItem('token');
-    const wb      = new ExcelJS.Workbook();
-    const ws      = wb.addWorksheet('Alertas');
+    const token = localStorage.getItem('token');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Alertas');
 
     ws.columns = [
-      { header: 'Timestamp',   key: 'time',        width: 25 },
+      { header: 'Timestamp', key: 'time', width: 25 },
       { header: 'Descripción', key: 'description', width: 30 },
-      { header: 'Tipo',        key: 'type',        width: 15 },
-      { header: 'Imagen',      key: 'link',        width: 40 },
+      { header: 'Tipo', key: 'type', width: 15 },
+      { header: 'Imagen', key: 'link', width: 40 },
     ];
 
     displayedAlerts.forEach(a => {
       const row = ws.addRow({
-        time:        a.time ?? a.timestamp,
+        time: a.time ?? a.timestamp,
         description: a.description,
-        type:        a.type,
+        type: a.type,
       });
       const cell = ws.getCell(`D${row.number}`);
       cell.value = {
@@ -177,6 +194,59 @@ export default function AlertsSummary() {
           />
         </div>
 
+
+
+        {/* FILTRAR POR EXAMEN */}
+        <div className="flex flex-col w-60 relative" ref={examFilterRef}>
+          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            Filtrar por examen
+          </label>
+
+          <input
+            type="text"
+            value={examSearch}
+            onChange={e => setExamSearch(e.target.value)}
+            placeholder={selectedExam ?? 'Buscar examen…'}
+            onClick={() => setDropdownOpen(true)}
+            onFocus={() => setDropdownOpen(true)}
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+
+          {dropdownOpen && (
+            <ul className="absolute left-0 top-full mt-1 w-full z-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+              {/* “Todos los exámenes” solo actualiza selectedExam */}
+              <li
+                onClick={() => {
+                  setSelectedExam(null);
+                  setDropdownOpen(false);
+                }}
+                className={`px-3 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-gray-700 ${selectedExam === null ? 'bg-indigo-100 dark:bg-gray-600' : ''
+                  }`}
+              >
+                Todos los exámenes
+              </li>
+
+              {allExamNames
+                .filter(name =>
+                  name.toLowerCase().includes(examSearch.toLowerCase())
+                )
+                .map(name => (
+                  <li
+                    key={name}
+                    onClick={() => {
+                      setSelectedExam(name);
+                      setDropdownOpen(false);
+                    }}
+                    className={`px-3 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-gray-700 ${selectedExam === name ? 'bg-indigo-100 dark:bg-gray-600' : ''
+                      }`}
+                  >
+                    {name}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+
         {/* Botón “Filtrar” (fechas) */}
         <button
           onClick={handleFilter}
@@ -184,26 +254,6 @@ export default function AlertsSummary() {
         >
           Filtrar
         </button>
-
-        {/* Dropdown examen */}
-        <div className="flex flex-col">
-          <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-            Filtrar por examen
-          </label>
-          <select
-            value={selectedExam}
-            onChange={e => handleExamFilter(e.target.value)}
-            className="px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="">Todos los exámenes</option>
-            {examNames.map((exam, idx) => (
-              <option key={idx} value={exam}>
-                {exam}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Selector de límite */}
         <div className="flex flex-col">
           <label className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -277,28 +327,59 @@ export default function AlertsSummary() {
         )}
       </ul>
 
-      {/* Paginación */}
-      <div className="flex justify-center mt-4 space-x-2">
-        <button
-          onClick={() => setPage(p => Math.max(p - 1, 1))}
-          disabled={page === 1}
-          className="px-3 py-1 border rounded"
-        >
-          ‹ Anterior
-        </button>
+{/* Paginación compacta sin flechas de spinner */}
+<div className="flex items-center justify-center mt-4 space-x-2 text-lg">
+  {/* Ir a primera */}
+  <button
+    onClick={() => setPage(1)}
+    disabled={page === 1}
+    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+  >
+    «
+  </button>
 
-        <span className="px-3 py-1">
-          Página {page} de {totalPages}
-        </span>
+  {/* Anterior */}
+  <button
+    onClick={() => setPage(p => Math.max(p - 1, 1))}
+    disabled={page === 1}
+    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+  >
+    ‹
+  </button>
 
-        <button
-          onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-          disabled={page === totalPages}
-          className="px-3 py-1 border rounded"
-        >
-          Siguiente ›
-        </button>
-      </div>
+  {/* Salto directo ingresando página (solo texto, sin spinner) */}
+  <div className="flex items-center">
+    <input
+      type="text"
+      inputMode="numeric"
+      value={page}
+      onChange={e => {
+        const v = Number(e.target.value.replace(/\D/g, ''));
+        if (v >= 1 && v <= totalPages) setPage(v);
+      }}
+      className="w-14 text-center appearance-none px-2 py-1 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+    />
+    <span className="ml-1">/ {totalPages}</span>
+  </div>
+
+  {/* Siguiente */}
+  <button
+    onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+    disabled={page === totalPages}
+    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+  >
+    ›
+  </button>
+
+  {/* Ir a última */}
+  <button
+    onClick={() => setPage(totalPages)}
+    disabled={page === totalPages}
+    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+  >
+    »
+  </button>
+</div>
     </div>
   );
 }
