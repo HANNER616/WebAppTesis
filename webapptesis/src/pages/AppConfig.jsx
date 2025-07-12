@@ -91,6 +91,26 @@ export default function ConfigAccount() {
           </div>
         </label>
 
+        <label className="flex flex-col space-y-1">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            Retraso de Sonido de Alerta: {delay}s
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="1"
+            value={delay}
+            onChange={e => setDelay(e.target.value)}
+            list="delayMarks"
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 "
+          />
+          <datalist id="delayMarks">
+            <option value="0" label="0s" />
+            <option value="3" label="3s" />
+            <option value="5" label="5s" />
+          </datalist>
+        </label>
 
         {/* Retraso de Sonido de Alerta */}
 
