@@ -1,5 +1,4 @@
-// src/components/HoverHint.jsx
-import React from 'react';
+// src/components/Hint.jsx
 import Tippy from '@tippyjs/react';
 import { HelpCircle } from 'lucide-react';
 
@@ -12,7 +11,7 @@ export default function HoverHint({ instruction }) {
   placement="right"
   animation="fade"
   arrow={false}
-  theme="translucent"                   // <— aquí
+  theme="translucent"               
   popperOptions={{
     modifiers: [
       {

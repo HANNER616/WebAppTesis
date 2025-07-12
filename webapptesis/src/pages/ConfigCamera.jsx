@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Sun, Moon } from 'lucide-react';
-import { useTheme } from "../ThemeContext";
-import Webcam from "../components/Webcam";
+import { useTheme } from "../contexts/ThemeContext";
 
 const RESOLUTION_MAP = {
   '1080p': { width: 1920, height: 1080 },

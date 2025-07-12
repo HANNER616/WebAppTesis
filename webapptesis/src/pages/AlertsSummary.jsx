@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Download, Search } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import api from '../lib/api';
+import apiAudit from '../lib/apiAudit';
 
 export default function AlertsSummary() {
   // Paginación
@@ -30,7 +30,7 @@ export default function AlertsSummary() {
 
 
   const [allExamNames, setAllExamNames] = useState([]);
-  // ▷ Para la búsqueda en el dropdown
+  // Para la búsqueda en el dropdown
   const [examSearch, setExamSearch] = useState('');
 
   // Resultado final tras aplicar filtros
@@ -51,11 +51,10 @@ export default function AlertsSummary() {
           params.examName = selectedExam;
         }
 
-        const resp = await api.get('/get-alerts-limited', {
+        const resp = await apiAudit.get('/get-alerts-limited', {
           headers: { Authorization: `Bearer ${token}` },
           params
         });
-
         setAlerts(resp.data.data);
         setTotal(resp.data.total);
         setDisplayedAlerts(resp.data.data); // Inicialmente muestra todo
@@ -82,14 +81,15 @@ export default function AlertsSummary() {
   }, []);
 
 
+
   useEffect(() => {
     const fetchExamNames = async () => {
       try {
         const token = localStorage.getItem('token');
-        const resp = await api.get('/get-exam-names', {
+        const resp = await apiAudit.get('/get-exam-names', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setAllExamNames(resp.data);  // ["Ex A","Ex B",…]
+        setAllExamNames(resp.data);  
       } catch (err) {
         console.error('Error al cargar exam names:', err);
         alert('Ha ocurrido un error al cargar los nombres de exámenes, intente más tarde.');
@@ -102,30 +102,24 @@ export default function AlertsSummary() {
 
   // Manejo de clic en “Filtrar” para fechas
   const handleFilter = () => {
-  
-  setFilterExam(selectedExam);
 
-  
-  setFilterStart(startDate || null);
-  setFilterEnd  (endDate   || null);
+    setFilterExam(selectedExam);
 
-  
-  setPage(1);
-  setExamSearch('');
-  setDropdownOpen(false);
-};
 
-  // 4) Dropdown examen solo actualiza selección
-  const handleExamFilter = (examName) => {
-    setSelectedExam(examName); // null = sin filtro
+    setFilterStart(startDate || null);
+    setFilterEnd(endDate || null);
+
+
     setPage(1);
+    setExamSearch('');
     setDropdownOpen(false);
-    setExamSearch('');         // limpia la búsqueda
   };
 
-  // 5) Download Excel (igual que antes)
+
+
+
   const handleDownload = async () => {
-    //const BACKEND = 'http://localhost:3001';
+    
     const baseURL = import.meta.env.VITE_AUDIT_BASE_URL;
 
     const token = localStorage.getItem('token');
@@ -163,14 +157,14 @@ export default function AlertsSummary() {
     );
   };
 
-  // 6) Render
+
   return (
     <div className="p-4 rounded-lg shadow bg-white dark:bg-gray-800 h-full flex flex-col">
       <h2 className="text-xl font-semibold mb-4 flex items-center">
         <FileText className="mr-2 h-5 w-5" /> Historial de Alertas
       </h2>
 
-      {/* ★ Controles de filtro (misma fila) */}
+      {/* Controles de filtro */}
       <div className="flex items-end gap-4 mb-6">
         {/* Fecha inicio */}
         <div className="flex flex-col">
@@ -218,7 +212,7 @@ export default function AlertsSummary() {
 
           {dropdownOpen && (
             <ul className="absolute left-0 top-full mt-1 w-full z-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg max-h-40 overflow-y-auto shadow-lg">
-              {/* “Todos los exámenes” solo actualiza selectedExam */}
+              {/* “Todos los examenes” solo actualiza selectedExam */}
               <li
                 onClick={() => {
                   setSelectedExam(null);
@@ -311,7 +305,7 @@ export default function AlertsSummary() {
               <button
                 onClick={() => {
                   const token = localStorage.getItem('token');
-                  api
+                  apiAudit
                     .get(`/alerts/${a.id}/frame`, {
                       responseType: 'blob',
                       headers: { Authorization: `Bearer ${token}` }
@@ -331,59 +325,59 @@ export default function AlertsSummary() {
         )}
       </ul>
 
-{/* Paginación compacta sin flechas de spinner */}
-<div className="flex items-center justify-center mt-4 space-x-2 text-lg">
-  {/* Ir a primera */}
-  <button
-    onClick={() => setPage(1)}
-    disabled={page === 1}
-    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-  >
-    «
-  </button>
+      {/* Paginación compacta sin flechas de spinner */}
+      <div className="flex items-center justify-center mt-4 space-x-2 text-lg">
+        {/* Ir a primera */}
+        <button
+          onClick={() => setPage(1)}
+          disabled={page === 1}
+          className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          «
+        </button>
 
-  {/* Anterior */}
-  <button
-    onClick={() => setPage(p => Math.max(p - 1, 1))}
-    disabled={page === 1}
-    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-  >
-    ‹
-  </button>
+        {/* Anterior */}
+        <button
+          onClick={() => setPage(p => Math.max(p - 1, 1))}
+          disabled={page === 1}
+          className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          ‹
+        </button>
 
-  {/* Salto directo ingresando página (solo texto, sin spinner) */}
-  <div className="flex items-center">
-    <input
-      type="text"
-      inputMode="numeric"
-      value={page}
-      onChange={e => {
-        const v = Number(e.target.value.replace(/\D/g, ''));
-        if (v >= 1 && v <= totalPages) setPage(v);
-      }}
-      className="w-14 text-center appearance-none px-2 py-1 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-    />
-    <span className="ml-1">/ {totalPages}</span>
-  </div>
+        {/* Salto directo ingresando página (solo texto, sin spinner) */}
+        <div className="flex items-center">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={page}
+            onChange={e => {
+              const v = Number(e.target.value.replace(/\D/g, ''));
+              if (v >= 1 && v <= totalPages) setPage(v);
+            }}
+            className="w-14 text-center appearance-none px-2 py-1 border rounded focus:outline-none focus:ring focus:ring-indigo-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+          <span className="ml-1">/ {totalPages}</span>
+        </div>
 
-  {/* Siguiente */}
-  <button
-    onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-    disabled={page === totalPages}
-    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-  >
-    ›
-  </button>
+        {/* Siguiente */}
+        <button
+          onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+          disabled={page === totalPages}
+          className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          ›
+        </button>
 
-  {/* Ir a última */}
-  <button
-    onClick={() => setPage(totalPages)}
-    disabled={page === totalPages}
-    className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-  >
-    »
-  </button>
-</div>
+        {/* Ir a última */}
+        <button
+          onClick={() => setPage(totalPages)}
+          disabled={page === totalPages}
+          className="p-2 border rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          »
+        </button>
+      </div>
     </div>
   );
 }

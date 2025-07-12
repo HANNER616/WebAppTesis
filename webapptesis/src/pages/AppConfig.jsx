@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useTheme } from "../ThemeContext"
+import { useTheme } from "../contexts/ThemeContext"
 import Hint from "../components/Hint"
 
 export default function ConfigAccount() {

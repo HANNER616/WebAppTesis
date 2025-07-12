@@ -1,15 +1,15 @@
-// src/lib/api.js
+// src/lib/apiAuth.js
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_AUDIT_BASE_URL, 
+const apiAuth = axios.create({
+  baseURL: import.meta.env.VITE_AUTH_BASE_URL, 
   headers: { 'Content-Type': 'application/json' }
 });
 
-api.interceptors.request.use(config => {
+apiAuth.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-export default api;
+export default apiAuth;

@@ -1,6 +1,7 @@
-// src/contexts/ExamProvider.jsx
-import React, { useState } from 'react';
-import { ExamContext } from './ExamContext';
+// src/contexts/ExamContext.js
+import { createContext, useState } from 'react';
+
+export const ExamContext = createContext();
 
 export function ExamProvider({ children }) {
   const [examActive, setExamActive] = useState(false);
@@ -10,3 +11,4 @@ export function ExamProvider({ children }) {
     </ExamContext.Provider>
   );
 }
+
