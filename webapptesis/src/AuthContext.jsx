@@ -15,8 +15,11 @@ export const AuthProvider = ({ children }) => {
   // Función para verificar en backend
   const verifyTokenOnServer = async (t) => {
 
+
+  const AuthBaseURL = import.meta.env.VITE_AUTH_BASE_URL; 
+
    
-    const res = await fetch('http://localhost:3000/service/auth/verify-token', {
+    const res = await fetch(`${AuthBaseURL}/verify-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: t }),

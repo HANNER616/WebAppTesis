@@ -11,6 +11,8 @@ router.post('/password-send-token', passwordSendToken); // Cambié el nombre de 
 router.post('/password-reset', updatePasswordReset);
 router.post('/update-password', updatePassword);
 router.post('/verify-token', verifyToken);
+router.get('/healthz', (_, res) => res.sendStatus(200));
+
 
 module.exports = router;
 

@@ -14,3 +14,13 @@ html, body, #root {
   height: 100%;
 }
 
+
+.tippy-box[data-theme~='translucent'] {
+  opacity: 0.70;        /* 50% de opacidad */
+}
+
+
+.tippy-box[data-theme~='translucent'] .tippy-content {
+  color: rgba(107, 114, 128, 0.75); 
+  font-size: 0.75rem;              
+}

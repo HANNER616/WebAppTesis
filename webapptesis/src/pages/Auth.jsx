@@ -13,6 +13,24 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const { login } = useAuth();
 
+  const AuthBaseURL = import.meta.env.VITE_AUTH_BASE_URL; 
+  const AuditBaseURL = import.meta.env.VITE_AUDIT_BASE_URL; 
+
+  const logEvent = async (type) => {
+    try {
+      await fetch(`${AuditBaseURL}/user-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ type })
+      })
+    } catch (err) {
+      console.error('Error al loguear evento:', err)
+    }
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault()
     // llamada a un microservicio para autenticar al usuario
@@ -28,7 +46,7 @@ export default function Auth() {
 
     // SEND DATA TO API
     try {
-      const response = await fetch('http://localhost:3000/service/auth/login', {
+      const response = await fetch(`${AuthBaseURL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,13 +71,18 @@ export default function Auth() {
         console.log('Token guardado en localStorage:', data.userInfo.token); //si imprime el toquen correctamente
 
         login(token,username,email); // Llama a la función de login del contexto
+        await logEvent('login')
         navigate("/") // Redirigir al dashboard después del login
 
       } else {
         console.error('Error en el login:', data.message);
+        alert('Credenciales erroneas');
+
       }
     } catch (error) {
       console.error('Error al conectar con la API:', error);
+      alert('No hay conexion con el servidor, intente mas tarde');
+
     }
     
 
@@ -77,7 +100,7 @@ export default function Auth() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/service/auth/signup', {
+      const response = await fetch(`${AuthBaseURL}/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,13 +112,15 @@ export default function Auth() {
 
       if (response.ok) {
         console.log('Signup succesfully:', data);
-
+        alert('Cuenta creada correctamente, por favor inicie sesion');
         setView("login")
 
       } else {
         console.error('Error en el login:', data.message);
+        alert('Ha ocurrido un error al registrarse, intente mas tarde');
       }
     } catch (error) {
+      alert('Error al conectar con la API, intente mas tarde');
       console.error('Error al conectar con la API:', error);
     }
 
@@ -114,7 +139,7 @@ export default function Auth() {
     //save email in local storage
     localStorage.setItem('email', formData.email);
     try{
-      const response = await fetch('http://localhost:3000/service/auth/password-send-token', {
+      const response = await fetch(`${AuthBaseURL}/password-send-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,6 +154,7 @@ export default function Auth() {
         
       } else {
         console.error('Token has not been sent succesfully:', data.message);
+        alert('El email ingresado no existe, intente nuevamente');
       }
 
       setView("enterToken")
@@ -136,6 +162,7 @@ export default function Auth() {
 
     }catch (error) {
       console.error('API CONNECTION ERROR:', error);
+      alert('Error al conectar con la API, intente mas tarde');
     
     }
   }
@@ -148,7 +175,7 @@ export default function Auth() {
     }
 
     try{
-      const response = await fetch('http://localhost:3000/service/auth/verify-token', {
+      const response = await fetch(`${AuthBaseURL}/verify-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +213,7 @@ export default function Auth() {
 
     
 
-    const response = await fetch('http://localhost:3000/service/auth/password-reset', {
+    const response = await fetch(`${AuthBaseURL}/password-reset`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -198,13 +225,16 @@ export default function Auth() {
     if (response.ok) {
       console.log('Password has been reset succesfully:', data);
       setView("login")
+      alert('Contraseña reseteada correctamente, por favor inicie sesión');
 
     } else {
       console.error('Password has not been reset succesfully:', data.message);
+      alert('Ha ocurrido un error al resetear la contraseña, intente mas tarde');
     }
 
   }catch (error) {
     console.error('API CONNECTION ERROR:', error);
+    alert('Error al conectar con la API, intente mas tarde');
 
   }
 

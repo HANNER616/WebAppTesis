@@ -1,5 +1,8 @@
 // controller/authController.js
 
+const nodemailer = require('nodemailer');
+
+
 const Audit = require('../models/auditModel'); // Asegúrate de que la ruta sea correcta
 
 const createExamSession = async (req, res) => {
@@ -44,17 +47,14 @@ const logAlert = async (req, res) => {
 };
 
 
-const getByDateRange = async (req, res, next) => {
+const getAllByUser = async (req, res, next) => {
   try {
-    const userId    = req.user.id;                // viene del middleware
-    const { startDate, endDate } = req.query;
-    console.log(
-      '🔍 getByDateRange for userId=',
-      userId, 'from', startDate, 'to', endDate
-    );
-    const audits = await Audit.getByDateRangeByUser(
-      userId, startDate, endDate
-    );
+    const userId = req.user.id;  // viene del middleware
+    console.log('🔍 getAllByUser for userId=', userId);
+
+    // Llamamos a la nueva función que no requiere fechas
+    const audits = await Audit.getAllByUser(userId);
+
     console.log('📨 returning audits:', audits);
     return res.status(200).json(audits);
   } catch (error) {
@@ -63,12 +63,46 @@ const getByDateRange = async (req, res, next) => {
   }
 };
 
+const getAlertsPaginated = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const startDate = req.query.startDate;    // opcional
+    const endDate = req.query.endDate;      // opcional
+    const examName = req.query.examName;     // opcional
+    console.log(`🔍 getAlertsPaginated userId=${userId} page=${page} limit=${limit} offset=${offset} startDate=${startDate} endDate=${endDate} examName=${examName}`);
+    // Datos paginados
+    const data = await Audit.getByUserPaginated(
+      userId,
+      limit,
+      offset,
+      startDate,
+      endDate,
+      examName
+    );
+    // Total para calcular totalPages
+    const total = await Audit.countByUser(
+      userId,
+      startDate,
+      endDate,
+      examName
+    );
+
+    return res.json({ data, total, page, limit });
+  } catch (err) {
+    console.error('Error en getAlertsLimited:', err);
+    return res.status(500).json({ message: 'Error fetching paginated alerts' });
+  }
+};
+
 
 const getFrame = async (req, res, next) => {
   try {
-    const { id }     = req.params;
-    const userId     = req.user.id;
-    const dataURL    = await Audit.getFrameById(id, userId);
+    const { id } = req.params;
+    const userId = req.user.id;
+    const dataURL = await Audit.getFrameById(id, userId);
 
     //console.log(`🔍 getFrame id=${id} userId=${userId} ➞ dataURL:`, dataURL?.slice(0,50));
 
@@ -78,12 +112,12 @@ const getFrame = async (req, res, next) => {
 
     // separa el mime y el base64
     const [meta, b64] = dataURL.split(',');
-    const m           = meta.match(/^data:(image\/\w+);base64$/);
+    const m = meta.match(/^data:(image\/\w+);base64$/);
     if (!m) {
       return res.status(500).send('Formato de Data-URL inválido');
     }
-    const mime    = m[1];
-    const buf     = Buffer.from(b64, 'base64');
+    const mime = m[1];
+    const buf = Buffer.from(b64, 'base64');
 
     res.set('Content-Type', mime);
     res.send(buf);
@@ -93,15 +127,100 @@ const getFrame = async (req, res, next) => {
 };
 
 
+const getExamNames = async (req, res) => {
+  try {
+    const userId = req.user.id;               // viene del JWT middleware
+    const names = await Audit.getExamNamesByUser(userId);
+    return res.json(names);                  // => ["Examen A","Examen B",…]
+  } catch (err) {
+    console.error('Error en getExamNames:', err);
+    return res.status(500).json({ message: 'Error fetching exam names' });
+  }
+};
+
+ const createUserEvent = async (req, res) => {
+  try {
+    const userId = req.user.id;      
+    const { type } = req.body;      
+    const newEvent = await Audit.sendUserEvent({ userId, type });
+    // newEvent tendrá { id, user_id, event_type, occurred_at }
+    return res.status(201).json(newEvent);
+  } catch (err) {
+    console.error('Error al crear UserEvent:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+
+const sendWarningEmailToUser = async (req, res) => {
+
+  const { email, username, examName, sessionId, numAlerts } = req.body;
+
+  if (!email || !username || !examName || !sessionId || !numAlerts) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+  }
+
+  try {
+    // 2. Configuramos el transporter de nodemailer
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // 3. Definimos las opciones del correo
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Advertencia: múltiples alertas detectadas',
+      text: `Hola ${username},
+
+Se ha detectado un número elevado de alertas durante tu sesión de examen "${examName}".
+
+Detalles de la sesión:
+  • ID de sesión: ${sessionId}
+  • Número de alertas: ${numAlerts}
+
+Por favor, revisa las condiciones de tu examen y asegúrate de cumplir con los requisitos.
+
+Un saludo,
+El equipo de monitoreo de exámenes
+`,
+    };
+
+    
+    await transporter.sendMail(mailOptions);
+
+  
+    return res
+      .status(200)
+      .json({ message: 'Correo de advertencia enviado correctamente.' });
+
+  } catch (error) {
+    console.error('Error enviando correo de advertencia:', error);
+    return res
+      .status(500)
+      .json({ error: 'Error interno: no se pudo enviar el correo.' });
+  }
+
+};
+
+
 
 
 
 
 
 module.exports = {
-    logAlert,
-    createExamSession,
-    getByDateRange,
-    getFrame
-    
+  logAlert,
+  createExamSession,
+  getAllByUser,
+  getExamNames,
+  getAlertsPaginated,
+  getFrame,
+  createUserEvent,
+  sendWarningEmailToUser
+
 };

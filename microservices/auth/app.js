@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-    origin: 'http://localhost:5173', // URL de tu frontend
+    origin: process.env.FRONTEND_URL, // URL de tu frontend
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -19,6 +19,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/service/auth', authRoutes);
+app.get('/healthz', (_, res) => res.sendStatus(200));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

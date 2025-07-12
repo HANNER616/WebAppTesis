@@ -10,8 +10,10 @@ dotenv.config();
 
 const app = express();
 
+app.use(express.json({ limit: '1mb' })); 
+
 app.use(cors({
-    origin: 'http://localhost:5173', // URL de tu frontend
+    origin: process.env.FRONTEND_URL, // URL de tu frontend
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -19,8 +21,9 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/service/audit', auditRoutes);
+app.get('/healthz', (_, res) => res.sendStatus(200));
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

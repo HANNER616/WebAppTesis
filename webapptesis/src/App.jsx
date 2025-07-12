@@ -1,7 +1,8 @@
+// src/App.jsx
 "use client"
 
+import React, { useState, useRef, useEffect, useContext, createContext } from "react"
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom"
-import { useState, useRef, useEffect, useContext } from "react"
 import { AuthProvider, useAuth } from "./AuthContext"
 import { ThemeProvider } from "./ThemeContext"
 import { Menu, Camera, FileText, Settings, LogOut, Play, Pause, Square } from "lucide-react"
@@ -10,41 +11,49 @@ import ConfigCamera from "./pages/ConfigCamera"
 import AppConfig from "./pages/AppConfig"
 import Auth from "./pages/Auth"
 import "./index.css"
-import WebcamComponent from './components/Webcam'
+import WebcamComponent from "./components/Webcam"
 import { openFrameInNewTab } from "./helpers"
-import { AlertsProvider, AlertsContext } from './AlertsContext'
-import DialogConfirmation from './components/DialogConfirmation.jsx'
-import api from './lib/api';
+import { AlertsProvider, AlertsContext } from "./AlertsContext"
+import DialogConfirmation from "./components/DialogConfirmation.jsx"
+import api from "./lib/api"
+
+// Context para compartir examActive
+export const ExamContext = createContext()
 
 function App() {
-  console.log("token:", localStorage.getItem('token'))
-  console.log("email:", localStorage.getItem('email'))
-  console.log("username:", localStorage.getItem('username'))
+  // Estado compartido
+  const [examActive, setExamActive] = useState(false)
+
+  //console.log("token:", localStorage.getItem("token"))
+  //console.log("email:", localStorage.getItem("email"))
+  //console.log("username:", localStorage.getItem("username"))
 
   return (
     <AuthProvider>
       <ThemeProvider>
         <AlertsProvider>
-          <Router>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/*"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/alerts" element={<AlertsSummary />} />
-                        <Route path="/config-camera" element={<ConfigCamera />} />
-                        <Route path="/config-app" element={<AppConfig />} />
-                      </Routes>
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Router>
+          <ExamContext.Provider value={{ examActive, setExamActive }}>
+            <Router>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/*"
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Routes>
+                          <Route path="/" element={<HomePage />} />
+                          <Route path="/alerts" element={<AlertsSummary />} />
+                          <Route path="/config-camera" element={<ConfigCamera />} />
+                          <Route path="/config-app" element={<AppConfig />} />
+                        </Routes>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Router>
+          </ExamContext.Provider>
         </AlertsProvider>
       </ThemeProvider>
     </AuthProvider>
@@ -67,76 +76,191 @@ function AppLayout({ children }) {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const { setAlerts } = useContext(AlertsContext)
+  const [User, setUser] = useState("")
+  const { examActive } = useContext(ExamContext)
+  const [refreshModalOpen, setRefreshModalOpen] = useState(false)
 
-  const handleLogout = () => {
+
+  useEffect(() => {
+    setUser(localStorage.getItem("username"))
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "F5" && examActive) {
+        e.preventDefault()
+        setRefreshModalOpen(true)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [examActive])
+
+
+  useEffect(() => {
+    const beforeUnloadHandler = (e) => {
+      if (examActive) {
+        // Estándar para Chrome y otros navegadores:
+        e.preventDefault()
+        // Algunos navegadores requieren asignar returnValue:
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnloadHandler)
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnloadHandler)
+    }
+  }, [examActive])
+
+  const logEvent = async (type) => {
+    const AuditBaseURL = import.meta.env.VITE_AUDIT_BASE_URL
+
+    try {
+      await fetch(`${AuditBaseURL}/user-event`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ type })
+      })
+    } catch (err) {
+      console.error('Error al loguear evento:', err)
+    }
+  }
+  const handleLogout = async () => {
+    await logEvent('logout')
+    localStorage.removeItem("token")
+    localStorage.removeItem("email")
+    localStorage.removeItem("username")
+    localStorage.removeItem("sessionId")
+    localStorage.removeItem("exam_name")
+
     logout()
     setAlerts([])
-    navigate('/auth')
+    navigate("/auth")
   }
 
+
+
+
   return (
-    <div className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
-      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="container mx-auto px-4 py-2 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold">Monitor de Aula</Link>
-          <div className="relative group">
-            <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-              <Menu className="h-5 w-5 text-gray-800 dark:text-gray-200" />
-            </button>
-            <div className="absolute right-0 top-full w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-              <Link to="/config-camera" className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                <Camera className="mr-2 h-4 w-4" /> Configuración de Cámara
-              </Link>
-              <Link to="/alerts" className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                <FileText className="mr-2 h-4 w-4" /> Registro de Incidentes
-              </Link>
-              <Link to="/config-app" className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                <Settings className="mr-2 h-4 w-4" /> Configuración
-              </Link>
-              <button onClick={handleLogout} className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left">
-                <LogOut className="mr-2 h-4 w-4" /> Salir
-              </button>
+    <>
+      {/*  ← Aquí pones el modal */}
+      {refreshModalOpen && (
+        <DialogConfirmation
+          isOpen={refreshModalOpen}
+          title="Advertencia"
+          message="Si reinicias la página, el examen se cerrará y la transmisión se detendrá. ¿Deseas continuar?"
+          confirmLabel="Continuar"
+          cancelLabel="Cancelar"
+          onConfirm={() => {
+            setRefreshModalOpen(false)
+            window.location.reload()
+          }}
+          onCancel={() => setRefreshModalOpen(false)}
+        />
+      )}
+      <div className="flex flex-col min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+        <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+            {/* Logo */}
+            <Link to="/" className="text-2xl font-bold">
+              Monitor de Aula
+            </Link>
+
+            {/* Zona derecha */}
+            <div className="flex items-center space-x-4">
+              {User && (
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-sm font-medium">{User}</span>
+                </div>
+              )}
+
+              {/* Contenedor que bloquea pointer-events cuando examActive */}
+              <div className={`relative ${examActive ? "pointer-events-none" : "group"}`}>
+                <button
+                  disabled={examActive}
+                  className={`p-2 rounded-full transition ${examActive
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                >
+                  <Menu className="h-5 w-5 text-gray-800 dark:text-gray-200" />
+                </button>
+                <div className="absolute right-0 top-full w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
+                  <Link
+                    to="/config-camera"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <Camera className="mr-2 h-4 w-4" /> Configuración de Cámara
+                  </Link>
+                  <Link
+                    to="/alerts"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <FileText className="mr-2 h-4 w-4" /> Registro de Incidentes
+                  </Link>
+                  <Link
+                    to="/config-app"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <Settings className="mr-2 h-4 w-4" /> Configuración
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Salir
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="flex-grow container mx-auto px-4 py-8 h-full">
-        {children}
-      </main>
+        <main className="flex-grow container mx-auto px-4 py-8 h-full">{children}</main>
 
-      <footer className="border-t border-gray-200 dark:border-gray-700 bg-transparent">
-        <div className="container mx-auto px-4 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
-          © 2023 Monitor de Aula. Todos los derechos reservados.
-        </div>
-      </footer>
-    </div>
+        <footer className="border-t border-gray-200 dark:border-gray-700 bg-transparent">
+          <div className="container mx-auto px-4 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+            © 2023 Monitor de Aula. Todos los derechos reservados.
+          </div>
+        </footer>
+      </div>
+    </>
   )
 }
 
 function HomePage() {
   const [showWebcam, setShowWebcam] = useState(false)
   const { alerts, setAlerts } = useContext(AlertsContext)
-  const [examActive, setExamActive] = useState(false)
+  const { examActive, setExamActive } = useContext(ExamContext)
   const [countdown, setCountdown] = useState(null)
   const [paused, setPaused] = useState(false)
   const sendInterval = useRef(null)
+  const [emailSent, setEmailSent] = useState(false)
 
-  // Modales de inicio y nombre
+  // Modales
   const [confirmStartModal, setConfirmStartModal] = useState(false)
   const [nameModalOpen, setNameModalOpen] = useState(false)
-  const [examName, setExamName] = useState('')
+  const [examName, setExamName] = useState("")
 
-  // Verifica cámara al montar
+  // Verificar cámara
   useEffect(() => {
     let mounted = true
-    navigator.mediaDevices.getUserMedia({ video: true })
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
       .then(stream => {
         if (mounted) setShowWebcam(true)
         stream.getTracks().forEach(t => t.stop())
       })
-      .catch(() => { if (mounted) setShowWebcam(false) })
-    return () => { mounted = false }
+      .catch(() => {
+        if (mounted) setShowWebcam(false)
+      })
+    return () => {
+      mounted = false
+    }
   }, [])
 
   // Cuenta regresiva
@@ -151,24 +275,24 @@ function HomePage() {
     }
   }, [countdown])
 
-  // Modal y lógica de inicio
+  // Lógica de inicio
   const openStartModal = () => setConfirmStartModal(true)
   const onConfirmStart = () => {
     setConfirmStartModal(false)
     setNameModalOpen(true)
   }
   const onSubmitName = async () => {
-  if (!examName.trim()) return;
-  localStorage.setItem('exam_name', examName.trim());
-
-  try {
-    await createSession();
-    setNameModalOpen(false);
-    setCountdown(3);
-  } catch {
-    
+    console.log("Nombre del examen:", examName)
+    setAlerts([])
+    setEmailSent(false)
+    if (!examName.trim()) return
+    localStorage.setItem("exam_name", examName.trim())
+    try {
+      const data = await createSession()
+      setNameModalOpen(false)
+      setCountdown(3)
+    } catch { }
   }
-};
   const onCancelModal = () => {
     setConfirmStartModal(false)
     setNameModalOpen(false)
@@ -178,7 +302,7 @@ function HomePage() {
   useEffect(() => {
     if (examActive && !paused) {
       sendInterval.current = setInterval(() => {
-        console.log('Enviando fotograma…')
+        console.log("Enviando fotograma…")
       }, 500)
     }
     return () => clearInterval(sendInterval.current)
@@ -193,28 +317,76 @@ function HomePage() {
   const handleNewAlert = alert => setAlerts(a => [...a, alert])
 
 
-  const createSession = async () => {
-  const examName = localStorage.getItem('exam_name');
-  const token    = localStorage.getItem('token');
 
-  try {
-    const resp = await api.post(
-      '/exam-session',
-      { sessionName: examName },
-      {
+
+  const emailAlertsEnabled = localStorage.getItem("emailAlertsEnabled")
+  const numAlerts = parseInt(localStorage.getItem("maxAlerts") ?? "0", 10)
+
+
+
+
+  const sendAlertToUserEmail = async () => {
+
+    const AuditBaseURL = import.meta.env.VITE_AUDIT_BASE_URL
+    const sessionId = localStorage.getItem("sessionId")
+    const username = localStorage.getItem("username")
+    const email = localStorage.getItem("email")
+    const examName = localStorage.getItem("exam_name")
+
+    console.log("alerts.length:", alerts.length)
+    console.log("numAlerts:", numAlerts)
+
+
+
+    try {
+      await fetch(`${AuditBaseURL}/send-warning-email`, {
+        method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-    console.log('Sesión creada:', resp.data);
-    localStorage.setItem('sessionId', resp.data.sessionId);
-    return resp.data;
-  } catch (err) {
-    console.error('Error creando sesión:', err);
-    throw err;
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ sessionId, username, email, examName, numAlerts: alerts.length })
+      })
+      setEmailSent(true)
+    } catch (err) {
+      console.error('Error al enviar email de alerta:', err)
+    }
+
+
+
+
   }
-};
+
+
+
+
+
+
+
+  useEffect(() => {
+
+    if (emailAlertsEnabled && alerts.length > numAlerts && !emailSent) {
+      sendAlertToUserEmail()
+    }
+
+  }, [alerts.length,emailSent, emailAlertsEnabled, numAlerts]);
+
+  const createSession = async () => {
+    const examNameLocal = localStorage.getItem("exam_name")
+    const token = localStorage.getItem("token")
+    try{
+    const resp = await api.post(
+      "/exam-session",
+      { sessionName: examNameLocal },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    localStorage.setItem("sessionId", resp.data.sessionId)
+    return resp.data
+  } catch (error) {
+    alert('No se ha podido establecer conexion con el servidor, intente más tarde.');
+  }
+    
+  }
 
   return (
     <>
@@ -271,7 +443,7 @@ function HomePage() {
                   className="flex items-center bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded shadow"
                 >
                   <Pause className="mr-1 h-4 w-4" />
-                  {paused ? 'Reanudar' : 'Pausar'}
+                  {paused ? "Reanudar" : "Pausar"}
                 </button>
                 <button
                   onClick={handleStopClick}
@@ -285,11 +457,10 @@ function HomePage() {
               <button
                 onClick={openStartModal}
                 disabled={countdown !== null || examActive}
-                className={`flex items-center px-4 py-2 rounded shadow text-white ${
-                  countdown !== null || examActive
-                    ? 'bg-green-300 cursor-not-allowed'
-                    : 'bg-green-500 hover:bg-green-600'
-                }`}
+                className={`flex items-center px-4 py-2 rounded shadow text-white ${countdown !== null || examActive
+                  ? "bg-green-300 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600"
+                  }`}
               >
                 <Play className="mr-2 h-5 w-5" />
                 Empezar examen
@@ -299,7 +470,7 @@ function HomePage() {
 
           {countdown !== null && countdown > 0 && (
             <div className="mb-4 text-center text-lg text-gray-700 dark:text-gray-300">
-              El examen "{localStorage.getItem('exam_name')}" va a iniciar en{' '}
+              El examen "{localStorage.getItem("exam_name")}" va a iniciar en{" "}
               <strong>{countdown}</strong> segundos…
             </div>
           )}
@@ -319,8 +490,7 @@ function HomePage() {
 
         <div className="p-4 rounded-lg shadow bg-white dark:bg-gray-800 transition-colors">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <FileText className="mr-2 h-5 w-5" />
-            Alertas
+            <FileText className="mr-2 h-5 w-5" /> Alertas
           </h2>
           <ul className="overflow-y-auto space-y-4 max-h-[550px]">
             {alerts.map((a, i) => (

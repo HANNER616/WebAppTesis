@@ -23,17 +23,34 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
   const webcamRef = useRef(null);
   const [response, setResponse] = useState(null);
   const [constraints, setConstraints] = useState(DEFAULT_CONSTRAINTS);
+  const soundOn = localStorage.getItem("sonidoAlertas") === "true";
+  const delaySec = parseInt(localStorage.getItem("alertDelay") || "0", 10)
+
+  const AuditbaseURL = import.meta.env.VITE_AUDIT_BASE_URL;
+  const StreamingbaseURL = import.meta.env.VITE_STREAMING_BASE_URL;
+
+  const confidenceThreshold = parseFloat(localStorage.getItem("confidenceThreshold") || "0.7");
 
 
-  useEffect(() => {
-    // Una llamada “vacía” a play() tras un click desbloquea el autoplay API
-    const unlock = () => {
-      audioRef.current.play().catch(() => { });
-      window.removeEventListener('click', unlock);
-    };
-    window.addEventListener('click', unlock);
-    return () => window.removeEventListener('click', unlock);
-  }, []);
+
+  // useEffect(() => {
+    
+
+  //   const unlock = () => {
+  //     const audio = audioRef.current;
+  //     const originalVolume = audio.volume;
+  //     audio.volume = 0;
+      
+  //     audioRef.volume=0;
+  //     audioRef.current.play().catch(() => { });
+  //     audio.volume = originalVolume;
+      
+  //     window.removeEventListener("click", unlock);
+  //   };
+
+  //   window.addEventListener("click", unlock);
+  //   return () => window.removeEventListener("click", unlock);
+  // }, []);
 
 
   useEffect(() => {
@@ -79,7 +96,7 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
 
     if (examActive) {
       // 1) Abrir WS
-      const ws = new WebSocket("ws://localhost:8080/video-stream");
+      const ws = new WebSocket(`${StreamingbaseURL}/video-stream`);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -144,18 +161,31 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
           ? parsed.image.split(',')[1]
           : parsed.image;
 
-        // sonido
-        const audio = audioRef.current;
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+
+        let confidence = typeof alert.confidence === "number" ? alert.confidence : parseFloat(alert.confidence) || 0;
+        console.log("Confianza usuario:",confidenceThreshold, "Confianza:", confidence);
+        if (confidence >= confidenceThreshold/100) {
+
+ // sonido
+        // const audio = audioRef.current;
+        // audio.currentTime = 0;
+        // audio.play().catch(() => { });
+
+
+        if (soundOn) {
+          setTimeout(() => {
+            audioRef.current.currentTime = 0
+            audioRef.current.play().catch(() => { })
+          }, delaySec * 1000)
+        }
 
         // notificar padre
         onNewAlert?.(alert);
 
         // enviar alerta al backend
-        fetch('http://localhost:3001/service/audit/alert', {
+        fetch(`${AuditbaseURL}/alert`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json','Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
           body: JSON.stringify({
             sessionId: localStorage.getItem('sessionId'),
             type: alert.type,
@@ -163,6 +193,19 @@ const CameraComponent = ({ onNewAlert, examActive, paused }) => {
             frame: alert.frame,
           }),
         }).catch(err => console.error("Error al enviar alerta:", err));
+
+
+
+        }else{
+          console.warn("Alerta ignorada por bajo nivel de confianza:", alert.confidence);
+        }
+
+
+       
+
+
+
+
       });
     } catch (err) {
       console.error("Error procesando mensaje WS:", err);
